@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	version     = "0.3.1"
+	version     = "0.4.0"
 	windowTitle = "Claude Cost"
 	mutexName   = `Local\claudecost-app`
 	minInterval = 5 * time.Minute
@@ -99,6 +99,14 @@ func main() {
 	cachePath := filepath.Join(dataDir, "parsecache.gob")
 	fingerprint := dataset.Fingerprint(version, &cfg)
 
+	// Where Settings saves land: the file that was actually loaded, or the
+	// default location next to the parse cache if none existed yet, so the
+	// very first save from the window creates it rather than erroring.
+	cfgSavePath := cfgFile
+	if cfgSavePath == "" {
+		cfgSavePath = filepath.Join(dataDir, "claudecost.json")
+	}
+
 	if alreadyRunning() {
 		log.Println("another instance is already running; bringing it to the front")
 		bringExistingToFront()
@@ -117,6 +125,7 @@ func main() {
 		interval:    *interval,
 		cachePath:   cachePath,
 		fingerprint: fingerprint,
+		cfgPath:     cfgSavePath,
 	}
 	a.cache.Load(a.cachePath, a.fingerprint)
 
@@ -178,6 +187,23 @@ func main() {
 		log.Println("could not bind ccRefresh:", err)
 	}
 
+	if err := w.Bind("ccSaveSettings", func(p settingsPayload) error {
+		if err := a.applySettings(p); err != nil {
+			return err
+		}
+		go func() {
+			if _, err := a.rebuild(progressReporter(w)); err != nil {
+				log.Println("rebuild after settings save failed:", err)
+				w.Dispatch(func() { w.Eval("window.ccSettingsRebuildFailed && window.ccSettingsRebuildFailed()") })
+				return
+			}
+			w.Dispatch(func() { w.Eval("location.reload()") })
+		}()
+		return nil
+	}); err != nil {
+		log.Println("could not bind ccSaveSettings:", err)
+	}
+
 	go func() {
 		ticker := time.NewTicker(*interval)
 		defer ticker.Stop()
@@ -236,6 +262,7 @@ type app struct {
 	interval    time.Duration
 	cachePath   string
 	fingerprint string
+	cfgPath     string
 
 	cache    dataset.Cache
 	mu       sync.Mutex
@@ -271,7 +298,7 @@ func (a *app) rebuild(progress func(done, total int)) (time.Time, error) {
 	}
 
 	built := time.Now()
-	html = applyAppChrome(html, a.interval)
+	html = a.applyAppChrome(html)
 	if err := os.WriteFile(a.htmlPath, []byte(html), 0o600); err != nil {
 		return time.Time{}, err
 	}
@@ -283,6 +310,112 @@ func (a *app) rebuild(progress func(done, total int)) (time.Time, error) {
 		log.Println("could not save parse cache:", err)
 	}
 	return built, nil
+}
+
+// ---------------------------------------------------------------------------
+// Settings: the Subscription block of the pricing config, editable from the
+// window itself instead of by hand-editing claudecost.json.
+// ---------------------------------------------------------------------------
+
+// settingsPayload is the shape ccSaveSettings receives from the settings
+// modal's Save button. Field names match the JS object literal exactly;
+// go-webview2 unmarshals the JS argument straight into this struct.
+type settingsPayload struct {
+	YourSeat                  string  `json:"yourSeat"`
+	MonthlySubscriptionEUR    float64 `json:"monthlySubscriptionEUR"`
+	MonthlySubscriptionUSD    float64 `json:"monthlySubscriptionUSD"`
+	SeatsPurchased            int     `json:"seatsPurchased"`
+	StandardSeats             int     `json:"standardSeats"`
+	PremiumSeats              int     `json:"premiumSeats"`
+	StandardSeatPriceUSD      float64 `json:"standardSeatPriceUSD"`
+	PremiumSeatPriceUSD       float64 `json:"premiumSeatPriceUSD"`
+	UsageCreditsBalanceEUR    float64 `json:"usageCreditsBalanceEUR"`
+	UsageCreditsSpentEUR      float64 `json:"usageCreditsSpentEUR"`
+	UsageCreditsMonthlyCapEUR float64 `json:"usageCreditsMonthlyCapEUR"`
+	CompanyConsumptionUSD     float64 `json:"companyConsumptionUSD"`
+	OutputCostFactor          float64 `json:"outputCostFactor"`
+	CalibratedOn              string  `json:"calibratedOn"`
+	Window                    string  `json:"window"`
+}
+
+// applySettings writes p to claudecost.json (preserving any other keys
+// already in that file, such as an unusual Prices override), then updates
+// the running config and seat in memory. It resets the parse cache outright
+// rather than just bumping the fingerprint: every already-cached session
+// carries costs computed with the old Subscription, and there is no cheap
+// way to tell which ones actually changed, so the honest fix is to treat
+// this exactly like a version or config-file change and re-parse
+// everything. The caller triggers the actual rebuild afterward.
+func (a *app) applySettings(p settingsPayload) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	sub := pricing.Subscription{
+		MonthlySubscriptionEUR:    p.MonthlySubscriptionEUR,
+		MonthlySubscriptionUSD:    p.MonthlySubscriptionUSD,
+		SeatsPurchased:            p.SeatsPurchased,
+		Seats:                     map[string]int{"Standard": p.StandardSeats, "Premium": p.PremiumSeats},
+		SeatPriceUSD:              map[string]float64{"Standard": p.StandardSeatPriceUSD, "Premium": p.PremiumSeatPriceUSD},
+		UsageCreditsBalanceEUR:    p.UsageCreditsBalanceEUR,
+		UsageCreditsSpentEUR:      p.UsageCreditsSpentEUR,
+		UsageCreditsMonthlyCapEUR: p.UsageCreditsMonthlyCapEUR,
+		CompanyConsumptionUSD:     p.CompanyConsumptionUSD,
+		OutputCostFactor:          p.OutputCostFactor,
+		CalibratedOn:              p.CalibratedOn,
+		Window:                    p.Window,
+	}
+	if err := writeSubscriptionConfig(a.cfgPath, sub); err != nil {
+		return err
+	}
+
+	a.cfg.Subscription = sub
+	if p.YourSeat == "Standard" || p.YourSeat == "Premium" {
+		a.seat = p.YourSeat
+	}
+	a.fingerprint = dataset.Fingerprint(version, &a.cfg)
+	a.cache = dataset.Cache{}
+	return nil
+}
+
+// writeSubscriptionConfig merges sub into the "subscription" key of the
+// JSON file at path, leaving any other keys (an unusual Prices override,
+// say) exactly as they were. A missing or unreadable existing file is
+// treated as empty, not an error: this is very likely the first time
+// anyone has saved settings from the window. Written via a .tmp file plus
+// os.Rename, same pattern as the parse cache, so a crash mid-write never
+// corrupts the real file.
+func writeSubscriptionConfig(path string, sub pricing.Subscription) error {
+	raw := map[string]json.RawMessage{}
+	if b, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(b, &raw)
+	}
+	subBytes, err := json.MarshalIndent(sub, "", "  ")
+	if err != nil {
+		return err
+	}
+	raw["subscription"] = subBytes
+
+	out, err := json.MarshalIndent(raw, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, out, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+// escapeAttr is a minimal HTML attribute escape for the couple of text
+// fields (CalibratedOn, Window) that land inside a value="..." attribute.
+// Not a general-purpose escaper, just enough for values the user themselves
+// typed into this same form a moment ago.
+func escapeAttr(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "\"", "&quot;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	return s
 }
 
 // ---------------------------------------------------------------------------
@@ -319,7 +452,7 @@ func warmingPageHTML() string {
 const cliRebuildNotice = `<b>This page is rebuilt every time you run claudecost.exe.</b> It reads your session transcripts live at each run, so refreshing is simply running it again: a new report is written and opened for you.`
 
 func appRebuildNotice(interval time.Duration) string {
-	return fmt.Sprintf(`<b>This window keeps itself current.</b> It opens straight to your last snapshot and quietly catches up in the background within moments. It also re-reads your session transcripts every %d minutes while open, and whenever you press Refresh now (top right).`,
+	return fmt.Sprintf(`<b>This window keeps itself current.</b> It opens straight to your last snapshot and quietly catches up in the background within moments. It also re-reads your session transcripts every %d minutes while open, whenever you press Refresh now (top right), and right after you save changes in Settings (the gear icon).`,
 		int(interval/time.Minute))
 }
 
@@ -330,10 +463,11 @@ func appRebuildNotice(interval time.Duration) string {
 // own at the bottom.
 const stampAnchor = `<div class="stamp" id="stamp"></div>`
 
-func stampAreaHTML() string {
+func (a *app) stampAreaHTML() string {
 	return `<div style="display:flex;align-items:center;gap:12px">
  <span style="color:var(--pine-40);font-size:11px;opacity:.75;white-space:nowrap">v` + version + `</span>
  <span id="cc_progress" style="display:none;color:var(--pine-40);font-size:12px;white-space:nowrap"></span>
+ <button id="cc_settings_btn" title="Subscription settings" style="padding:6px 10px;border:1px solid var(--pine-40);border-radius:6px;background:transparent;color:#fff;font:14px 'Inter','Segoe UI',sans-serif;cursor:pointer;white-space:nowrap">&#9881;</button>
  <button id="cc_btn" style="padding:6px 12px;border:1px solid var(--pine-40);border-radius:6px;background:transparent;color:#fff;font:13px 'Inter','Segoe UI',sans-serif;cursor:pointer;white-space:nowrap">Refresh now</button>
  ` + stampAnchor + `
 </div>`
@@ -394,23 +528,143 @@ const appChromeScript = `
 })();
 </script>`
 
-func applyAppChrome(html string, interval time.Duration) string {
+func (a *app) applyAppChrome(html string) string {
 	if n := strings.Count(html, cliRebuildNotice); n != 1 {
 		log.Printf("warning: rebuild notice found %d times in the rendered template, expected 1", n)
 	}
-	html = strings.Replace(html, cliRebuildNotice, appRebuildNotice(interval), 1)
+	html = strings.Replace(html, cliRebuildNotice, appRebuildNotice(a.interval), 1)
 
 	if n := strings.Count(html, stampAnchor); n != 1 {
 		log.Printf("warning: snapshot stamp found %d times in the rendered template, expected 1; Refresh now not placed", n)
 	} else {
-		html = strings.Replace(html, stampAnchor, stampAreaHTML(), 1)
+		html = strings.Replace(html, stampAnchor, a.stampAreaHTML(), 1)
 	}
 
 	if !strings.Contains(html, "</body>") {
 		log.Println("warning: no </body> in the rendered template; chrome not injected")
 		return html
 	}
-	return strings.Replace(html, "</body>", appChromeStyle+appChromeScript+"</body>", 1)
+	return strings.Replace(html, "</body>", appChromeStyle+appChromeScript+a.settingsModalHTML()+"</body>", 1)
+}
+
+// settingsModalHTML renders the Settings overlay, pre-filled with the
+// currently loaded subscription numbers and seat, so opening it always
+// shows what the dashboard is actually using right now, not stale form
+// defaults. Saving posts to ccSaveSettings (bound in main), which writes
+// claudecost.json, resets the parse cache, and rebuilds in the background.
+func (a *app) settingsModalHTML() string {
+	sub := a.cfg.Subscription
+	std := sub.Seats["Standard"]
+	prem := sub.Seats["Premium"]
+	stdPrice := sub.SeatPriceUSD["Standard"]
+	premPrice := sub.SeatPriceUSD["Premium"]
+	selected := func(seat string) string {
+		if a.seat == seat {
+			return " selected"
+		}
+		return ""
+	}
+	f := func(v float64) string { return fmt.Sprintf("%v", v) }
+	n := func(v int) string { return fmt.Sprintf("%d", v) }
+
+	return `
+<div id="cc_settings_overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;font-family:'Inter','Segoe UI',sans-serif">
+ <div style="background:#1f2733;color:#eee;border-radius:10px;padding:22px 26px;width:480px;max-height:86vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.5)">
+  <h3 style="margin:0 0 4px;font-size:16px">Subscription settings</h3>
+  <p style="margin:0 0 16px;color:#9fb4bd;font-size:12px">Saved to claudecost.json in this window's data folder. Saving triggers a full re-read: cached sessions carry costs computed with the old numbers.</p>
+  <div id="cc_settings_error" style="display:none;margin-bottom:12px;color:#ff8a65;font-size:12px"></div>
+  <style>
+   #cc_settings_overlay label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#c8d4d9}
+   #cc_settings_overlay input,#cc_settings_overlay select{background:#111a24;border:1px solid var(--pine-40);border-radius:6px;color:#fff;padding:6px 8px;font-size:13px}
+   #cc_settings_overlay .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+  </style>
+  <div class="grid">
+   <label>Your seat
+    <select id="cc_s_yourSeat">
+     <option value="Standard"` + selected("Standard") + `>Standard</option>
+     <option value="Premium"` + selected("Premium") + `>Premium</option>
+    </select></label>
+   <div></div>
+   <label>Monthly subscription (EUR)<input id="cc_s_subEUR" type="number" step="0.01" min="0" value="` + f(sub.MonthlySubscriptionEUR) + `"></label>
+   <label>Monthly subscription (USD)<input id="cc_s_subUSD" type="number" step="0.01" min="0" value="` + f(sub.MonthlySubscriptionUSD) + `"></label>
+   <label>Seats purchased<input id="cc_s_seatsTotal" type="number" step="1" min="0" value="` + n(sub.SeatsPurchased) + `"></label>
+   <div></div>
+   <label>Standard seats<input id="cc_s_seatsStd" type="number" step="1" min="0" value="` + n(std) + `"></label>
+   <label>Premium seats<input id="cc_s_seatsPrem" type="number" step="1" min="0" value="` + n(prem) + `"></label>
+   <label>Standard seat price (USD)<input id="cc_s_priceStd" type="number" step="0.01" min="0" value="` + f(stdPrice) + `"></label>
+   <label>Premium seat price (USD)<input id="cc_s_pricePrem" type="number" step="0.01" min="0" value="` + f(premPrice) + `"></label>
+   <label>Usage credits balance (EUR)<input id="cc_s_creditsBal" type="number" step="0.01" min="0" value="` + f(sub.UsageCreditsBalanceEUR) + `"></label>
+   <label>Usage credits spent (EUR)<input id="cc_s_creditsSpent" type="number" step="0.01" min="0" value="` + f(sub.UsageCreditsSpentEUR) + `"></label>
+   <label>Usage credits monthly cap (EUR)<input id="cc_s_creditsCap" type="number" step="0.01" min="0" value="` + f(sub.UsageCreditsMonthlyCapEUR) + `"></label>
+   <label>Company consumption (USD)<input id="cc_s_companyUSD" type="number" step="0.01" min="0" value="` + f(sub.CompanyConsumptionUSD) + `"></label>
+  </div>
+  <details style="margin-top:14px">
+   <summary style="cursor:pointer;color:#9fb4bd;font-size:12px">Advanced (recalibration)</summary>
+   <div class="grid" style="margin-top:10px">
+    <label>Output cost factor<input id="cc_s_factor" type="number" step="0.0001" min="0" value="` + f(sub.OutputCostFactor) + `"></label>
+    <div></div>
+    <label>Calibrated on<input id="cc_s_calibratedOn" type="text" value="` + escapeAttr(sub.CalibratedOn) + `"></label>
+    <label>Window<input id="cc_s_window" type="text" value="` + escapeAttr(sub.Window) + `"></label>
+   </div>
+  </details>
+  <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px">
+   <button id="cc_s_cancel" style="padding:6px 14px;border:1px solid var(--pine-40);border-radius:6px;background:transparent;color:#fff;font:13px 'Inter','Segoe UI',sans-serif;cursor:pointer">Cancel</button>
+   <button id="cc_s_save" style="padding:6px 14px;border:1px solid #FFDD32;border-radius:6px;background:transparent;color:#FFDD32;font:13px 'Inter','Segoe UI',sans-serif;cursor:pointer">Save and reload</button>
+  </div>
+ </div>
+</div>
+<script>
+(function(){
+  var btn = document.getElementById('cc_settings_btn');
+  var overlay = document.getElementById('cc_settings_overlay');
+  if(!btn || !overlay) return;
+  var errEl = document.getElementById('cc_settings_error');
+  var saveBtn = document.getElementById('cc_s_save');
+
+  btn.onclick = function(){ if(errEl) errEl.style.display='none'; overlay.style.display='flex'; };
+  var cancelBtn = document.getElementById('cc_s_cancel');
+  if(cancelBtn) cancelBtn.onclick = function(){ overlay.style.display='none'; };
+
+  window.ccSettingsRebuildFailed = function(msg){
+    document.body.style.opacity = '';
+    if(saveBtn){ saveBtn.disabled = false; saveBtn.textContent = 'Save and reload'; }
+    if(errEl){ errEl.textContent = msg || 'Rebuild failed after saving; your numbers were kept, try Refresh now.'; errEl.style.display = 'block'; }
+  };
+
+  if(saveBtn) saveBtn.onclick = function(){
+    var num = function(id){ var v = parseFloat(document.getElementById(id).value); return isNaN(v) ? 0 : v; };
+    var int = function(id){ var v = parseInt(document.getElementById(id).value, 10); return isNaN(v) ? 0 : v; };
+    var payload = {
+      yourSeat: document.getElementById('cc_s_yourSeat').value,
+      monthlySubscriptionEUR: num('cc_s_subEUR'),
+      monthlySubscriptionUSD: num('cc_s_subUSD'),
+      seatsPurchased: int('cc_s_seatsTotal'),
+      standardSeats: int('cc_s_seatsStd'),
+      premiumSeats: int('cc_s_seatsPrem'),
+      standardSeatPriceUSD: num('cc_s_priceStd'),
+      premiumSeatPriceUSD: num('cc_s_pricePrem'),
+      usageCreditsBalanceEUR: num('cc_s_creditsBal'),
+      usageCreditsSpentEUR: num('cc_s_creditsSpent'),
+      usageCreditsMonthlyCapEUR: num('cc_s_creditsCap'),
+      companyConsumptionUSD: num('cc_s_companyUSD'),
+      outputCostFactor: num('cc_s_factor'),
+      calibratedOn: document.getElementById('cc_s_calibratedOn').value,
+      window: document.getElementById('cc_s_window').value
+    };
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+    if(errEl) errEl.style.display = 'none';
+    window.ccSaveSettings(payload).then(function(){
+      saveBtn.textContent = 'Rebuilding…';
+      document.body.style.opacity = '.6';
+    }).catch(function(err){
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save and reload';
+      if(errEl){ errEl.textContent = String(err); errEl.style.display = 'block'; }
+    });
+  };
+})();
+</script>`
 }
 
 func toFileURL(path string) string {
