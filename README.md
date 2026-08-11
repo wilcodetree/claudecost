@@ -37,6 +37,10 @@ running in the background.
   reads every transcript; later starts show the previous dashboard right
   away and quietly refresh in the background. Delete that file to force a
   full re-read.
+- Click the gear icon (top right, next to Refresh now) to edit your
+  subscription numbers, seat counts and seat prices from inside the window,
+  no more hand-editing `claudecost.json`. Saving re-reads everything, since
+  cached sessions carry costs computed with the old numbers.
 
 Windows will likely show a blue "Windows protected your PC" screen the first
 time, since this is an unsigned binary. That is expected: click **More info**,
@@ -89,13 +93,22 @@ them anywhere; no install.
 ## Configuration
 
 Prices and the subscription calibration are compiled in as illustrative
-defaults (see `internal\pricing\pricing.go`), not a real invoice. When your
-own seat counts, invoice total or price list change, do not rebuild: drop a
-`claudecost.json` next to the exe (CLI) or pass `-config` (app), overriding
-any subset of the defaults. See `claudecost.example.json`. The recommended
-calibration source is your real invoice total divided by consumption, not
-seats times list price, since a flat subscription rarely maps cleanly to
-per-seat usage.
+defaults (see `internal\pricing\pricing.go`), not a real invoice. Plug in
+your own numbers one of two ways.
+
+In the app, click the gear icon and fill in the form: your subscription
+total, seat counts, seat prices, usage credits, and (behind an Advanced
+section, since it changes far less often) the output cost factor and
+calibration date. Saving writes `claudecost.json` for you and re-reads
+everything.
+
+Or edit the file directly, useful for the CLI, for scripting, or for
+anything outside the subscription block, such as an unusual per-model price
+override: drop a `claudecost.json` next to the exe (CLI) or pass `-config`
+(app), overriding any subset of the defaults. See `claudecost.example.json`.
+The recommended calibration source is your real invoice total divided by
+consumption, not seats times list price, since a flat subscription rarely
+maps cleanly to per-seat usage.
 
 ## Status
 
