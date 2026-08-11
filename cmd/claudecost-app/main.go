@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	version     = "0.3.0"
+	version     = "0.3.1"
 	windowTitle = "Claude Cost"
 	mutexName   = `Local\claudecost-app`
 	minInterval = 5 * time.Minute
@@ -291,7 +291,7 @@ func (a *app) rebuild(progress func(done, total int)) (time.Time, error) {
 // ---------------------------------------------------------------------------
 
 const warmingPageTemplate = `<!doctype html><title>Claude Cost</title><body style="font-family:sans-serif;background:#1f2733;
-color:#eee;display:grid;place-items:center;height:100vh">
+color:#eee;display:grid;place-items:center;height:100vh;margin:0;overflow:hidden">
 <div style="text-align:center;min-width:320px">
  <div>Reading your session transcripts&hellip;</div>
  <div style="margin:14px auto 0;width:320px;height:8px;background:#334455;border-radius:4px;overflow:hidden">
@@ -319,7 +319,7 @@ func warmingPageHTML() string {
 const cliRebuildNotice = `<b>This page is rebuilt every time you run claudecost.exe.</b> It reads your session transcripts live at each run, so refreshing is simply running it again: a new report is written and opened for you.`
 
 func appRebuildNotice(interval time.Duration) string {
-	return fmt.Sprintf(`<b>This window keeps itself current.</b> It re-reads your session transcripts when it opens, every %d minutes while open, and when you press Refresh now (top right).`,
+	return fmt.Sprintf(`<b>This window keeps itself current.</b> It opens straight to your last snapshot and quietly catches up in the background within moments. It also re-reads your session transcripts every %d minutes while open, and whenever you press Refresh now (top right).`,
 		int(interval/time.Minute))
 }
 
