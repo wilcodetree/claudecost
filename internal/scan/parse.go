@@ -54,6 +54,7 @@ type Session struct {
 	CacheR         int64                `json:"cache_r"`
 	Out            int64                `json:"out"`
 	Models         map[string]*PerModel `json:"models"`
+	Tools          map[string]int64     `json:"tools,omitempty"`
 	Daily          map[string]*PerModel `json:"-"`
 	Long           bool                 `json:"long"`
 }
@@ -153,6 +154,38 @@ func round6(x float64) float64 {
 	return math.Round(x*1e6) / 1e6
 }
 
+// ToolGroup maps a raw tool name to the thing a human recognises: the
+// connector it belongs to, the plugin-qualified skill it invoked, or
+// "(built in)" for Claude's own tools.
+//
+// mcp__<server>__<tool> groups as <server>. A Skill call is pre-tagged by
+// ParseSession as "skill:<name>", where <name> is whatever the Skill
+// tool's own "skill" argument was (already "plugin:skill" for a plugin
+// skill, or a bare name for an unscoped one); that group is <name>
+// unchanged, so the plugin, if any, is right there in the label. Anything
+// else (Read, Write, Bash, Grep, Glob, Task, Agent, WebSearch, WebFetch,
+// ToolSearch, TodoWrite, an unidentified Skill call, and any future name)
+// groups as "(built in)". A connector name that is a bare UUID or hex
+// blob is passed through unchanged: resolving it into something readable
+// needs data this package does not have, so display-side truncation is
+// the caller's job.
+func ToolGroup(name string) string {
+	const mcpPrefix = "mcp__"
+	const skillPrefix = "skill:"
+	switch {
+	case strings.HasPrefix(name, mcpPrefix):
+		rest := name[len(mcpPrefix):]
+		if idx := strings.Index(rest, "__"); idx >= 0 {
+			return rest[:idx]
+		}
+		return rest
+	case strings.HasPrefix(name, skillPrefix):
+		return name[len(skillPrefix):]
+	default:
+		return "(built in)"
+	}
+}
+
 type turn struct {
 	ts, model                string
 	fresh, cacheW, cacheR, o int64
@@ -172,8 +205,13 @@ func ParseSession(path string, cfg *pricing.Config) *Session {
 	title := ""
 	calls := map[string]*turn{}
 	var order []string
+	// toolCounts is keyed by the same requestId/uuid used to dedup usage
+	// turns below: a streamed call repeats its tool_use blocks across
+	// partial lines, so each key keeps the LARGEST per-name count seen on
+	// any single line, mirroring the largest-output_tokens-wins rule.
+	toolCounts := map[string]map[string]int64{}
 
-	for _, line := range strings.Split(string(raw), "\n") {
+	for i, line := range strings.Split(string(raw), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -201,6 +239,59 @@ func ParseSession(path string, cfg *pricing.Config) *Session {
 		msg, ok := obj["message"].(map[string]any)
 		if !ok {
 			continue
+		}
+
+		// Tool calls are counted on every assistant line, before the usage
+		// check below continues past lines with no usage block: a tool_use
+		// content block can appear on a line that carries no token usage.
+		if content, ok := msg["content"].([]any); ok {
+			lineTools := map[string]int64{}
+			for _, item := range content {
+				block, ok := item.(map[string]any)
+				if !ok || block["type"] != "tool_use" {
+					continue
+				}
+				name, ok := block["name"].(string)
+				if !ok || name == "" {
+					continue
+				}
+				// A Skill call's own name is just "Skill" for every skill; the
+				// actual skill (already "plugin:skill" when it came from a
+				// plugin) sits in the tool's input, mirroring the "skill"
+				// argument on the Skill tool itself. Re-tag the counted name so
+				// ToolGroup can break skills out instead of folding every one
+				// of them into "(built in)". An identifiable skill call that is
+				// missing or malformed input falls back to plain "Skill", which
+				// still groups as "(built in)".
+				if name == "Skill" {
+					if in, ok := block["input"].(map[string]any); ok {
+						if sk, ok := in["skill"].(string); ok && sk != "" {
+							name = "skill:" + sk
+						}
+					}
+				}
+				lineTools[name]++
+			}
+			if len(lineTools) > 0 {
+				tk := ""
+				if s, ok := obj["requestId"].(string); ok && s != "" {
+					tk = s
+				} else if s, ok := obj["uuid"].(string); ok && s != "" {
+					tk = s
+				} else {
+					tk = fmt.Sprintf("_toolrow%d", i)
+				}
+				seen := toolCounts[tk]
+				if seen == nil {
+					seen = map[string]int64{}
+					toolCounts[tk] = seen
+				}
+				for name, c := range lineTools {
+					if c > seen[name] {
+						seen[name] = c
+					}
+				}
+			}
 		}
 		usage, ok := msg["usage"].(map[string]any)
 		if !ok || len(usage) == 0 {
@@ -233,6 +324,19 @@ func ParseSession(path string, cfg *pricing.Config) *Session {
 		} else if e.o >= prev.o {
 			calls[key] = e
 		}
+	}
+
+	// requestId/uuid is not applied to tool counts across the request's
+	// own dedup key; each key's largest-per-name count is summed once here.
+	toolTotals := map[string]int64{}
+	for _, seen := range toolCounts {
+		for name, c := range seen {
+			toolTotals[name] += c
+		}
+	}
+	var toolsOut map[string]int64
+	if len(toolTotals) > 0 {
+		toolsOut = toolTotals
 	}
 
 	var turns []*turn
@@ -338,6 +442,7 @@ func ParseSession(path string, cfg *pricing.Config) *Session {
 		CacheR:         cacheR,
 		Out:            out,
 		Models:         perModel,
+		Tools:          toolsOut,
 		Daily:          daily,
 		Long:           callsN > LongSessionCalls,
 	}

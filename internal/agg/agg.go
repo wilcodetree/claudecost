@@ -26,6 +26,14 @@ type ModelAgg struct {
 	CostSub float64 `json:"cost_sub"`
 }
 
+// ToolAgg is one connector or plugin group's tool-call footprint inside a
+// bucket. Keyed by scan.ToolGroup, not the raw tool name: per-tool detail
+// stays on the session rows in the payload.
+type ToolAgg struct {
+	Calls    int64 `json:"calls"`
+	Sessions int64 `json:"sessions"`
+}
+
 type Bucket struct {
 	Calls     int64                  `json:"calls"`
 	Tokens    int64                  `json:"tokens"`
@@ -38,12 +46,14 @@ type Bucket struct {
 	Out       int64                  `json:"out"`
 	BySurface map[string]*SurfaceAgg `json:"by_surface"`
 	ByModel   map[string]*ModelAgg   `json:"by_model"`
+	ByTool    map[string]*ToolAgg    `json:"by_tool,omitempty"`
 }
 
 func newBucket() *Bucket {
 	return &Bucket{
 		BySurface: map[string]*SurfaceAgg{},
 		ByModel:   map[string]*ModelAgg{},
+		ByTool:    map[string]*ToolAgg{},
 	}
 }
 
@@ -72,6 +82,15 @@ func (b *Bucket) model(k string) *ModelAgg {
 		b.ByModel[k] = m
 	}
 	return m
+}
+
+func (b *Bucket) tool(k string) *ToolAgg {
+	t := b.ByTool[k]
+	if t == nil {
+		t = &ToolAgg{}
+		b.ByTool[k] = t
+	}
+	return t
 }
 
 func monthKey(d time.Time) string {
@@ -179,6 +198,32 @@ func Build(sessions []*scan.Session, cutoff time.Time) (months, weeks, days map[
 				bm.Tokens += mv.Tokens
 				bm.Cost += mv.Cost
 				bm.CostSub += mv.CostSub
+			}
+		}
+
+		// Tool split, whole-session granularity, grouped by connector/plugin
+		// (scan.ToolGroup) rather than raw tool name. Sessions is the count of
+		// distinct sessions that used the group at least once, matching how
+		// SurfaceAgg.Sessions is computed above; a session calling the same
+		// group's tools several times still counts once.
+		if len(s.Tools) > 0 {
+			groupSeen := map[string]bool{}
+			for tn := range s.Tools {
+				groupSeen[scan.ToolGroup(tn)] = true
+			}
+			groups := make([]string, 0, len(groupSeen))
+			for g := range groupSeen {
+				groups = append(groups, g)
+			}
+			sort.Strings(groups)
+			for _, t := range targets {
+				b := get(t.m, t.key)
+				for _, g := range groups {
+					b.tool(g).Sessions++
+				}
+				for tn, calls := range s.Tools {
+					b.tool(scan.ToolGroup(tn)).Calls += calls
+				}
 			}
 		}
 

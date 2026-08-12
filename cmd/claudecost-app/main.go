@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	version     = "0.4.0"
+	version     = "0.6.3"
 	windowTitle = "Claude Cost"
 	mutexName   = `Local\claudecost-app`
 	minInterval = 5 * time.Minute
@@ -288,6 +288,7 @@ func (a *app) rebuild(progress func(done, total int)) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, err
 	}
+	logSourceScan(a.cache.Sources, a.cache.Files)
 	blob, err := json.Marshal(payload)
 	if err != nil {
 		return time.Time{}, err
@@ -310,6 +311,25 @@ func (a *app) rebuild(progress func(done, total int)) (time.Time, error) {
 		log.Println("could not save parse cache:", err)
 	}
 	return built, nil
+}
+
+// logSourceScan writes one line per scanned source folder with the number of
+// transcript files found under it, plus a total. Kept deliberately terse: it
+// exists so a "my dashboard stopped at last month" report can be diagnosed
+// from app.log alone, by seeing which folders were scanned and which were
+// empty, without touching the user's machine.
+func logSourceScan(sources, files []string) {
+	for _, src := range sources {
+		n := 0
+		prefix := src + string(os.PathSeparator)
+		for _, f := range files {
+			if strings.HasPrefix(f, prefix) {
+				n++
+			}
+		}
+		log.Printf("source %s: %d transcript files", src, n)
+	}
+	log.Printf("sources scanned: %d, transcript files total: %d", len(sources), len(files))
 }
 
 // ---------------------------------------------------------------------------

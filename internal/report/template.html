@@ -141,6 +141,7 @@ code{background:var(--merc-l);padding:1px 5px;border-radius:4px;font-size:12.5px
   <button class="tab" data-t="weeks">Weeks</button>
   <button class="tab" data-t="days">Days</button>
   <button class="tab" data-t="sessions">Sessions</button>
+  <button class="tab" data-t="tools">Tools</button>
   <button class="tab" data-t="how">How it works</button>
   <button class="tab" data-t="about">About</button>
 </div></div>
@@ -231,6 +232,15 @@ code{background:var(--merc-l);padding:1px 5px;border-radius:4px;font-size:12.5px
     <th class="nosort">Models</th><th data-s="calls">Calls</th><th data-s="tokens">Tokens</th>
     <th data-s="cost_per_call">Per call</th><th data-s="cost">Cost</th>
   </tr></thead><tbody></tbody><tfoot></tfoot></table></div>
+</section>
+
+<section id="tools" class="hidden">
+  <h2>Tools and connectors</h2>
+  <p class="lede">Which connectors, plugins and skills your sessions actually call, over the whole window. Tool traffic is not charged separately; this is here to show what is earning its place in the context and what is dead weight.</p>
+  <div class="chartbox" style="margin-bottom:18px;height:320px"><canvas id="ch_tools"></canvas></div>
+  <div class="scroll"><table id="t_tools"><thead><tr>
+    <th class="nosort">Connector, plugin or skill</th><th>Calls</th><th>Sessions</th><th class="nosort">Share of calls</th>
+  </tr></thead><tbody></tbody></table></div>
 </section>
 
 <section id="how" class="hidden">
@@ -706,6 +716,74 @@ function renderPeriods(){
   }
 }
 
+// ---------- tools ----------
+// looksLikeHex flags a hyphen-split segment that is purely hex digits, the
+// shape of a UUID or hash rather than a readable word: real words almost
+// always contain a letter outside a-f (g,h,i,...,z), which no hex digit is.
+function looksLikeHex(s){ return /^[0-9a-f]+$/i.test(s); }
+function groupDisplay(g){
+  var segs = g.split('-');
+  var hasWordSeg = segs.some(function(s){ return s.length >= 3 && !looksLikeHex(s); });
+  if(g.length >= 24 && !hasWordSeg) return {short: g.slice(0,8) + '…', full: g};
+  return {short: g, full: g};
+}
+function renderTools(){
+  var totals = {};
+  Object.keys(D.months||{}).forEach(function(mk){
+    var bt = (D.months[mk]||{}).by_tool || {};
+    Object.keys(bt).forEach(function(g){
+      var t = totals[g] || (totals[g] = {calls:0, sessions:0});
+      t.calls += bt[g].calls||0;
+      t.sessions += bt[g].sessions||0;
+    });
+  });
+  var groups = Object.keys(totals).sort(function(a,b){ return totals[b].calls - totals[a].calls; });
+  var totalCalls = 0;
+  groups.forEach(function(g){ totalCalls += totals[g].calls; });
+
+  var tb = document.querySelector('#t_tools tbody');
+  var canvas = document.getElementById('ch_tools');
+  var box = canvas ? canvas.closest('.chartbox') : null;
+  if(!groups.length || !totalCalls){
+    tb.innerHTML = '<tr><td colspan="4" class="small">No tool data yet. Tool counting starts with '
+      + 'v0.5.0, so sessions parsed by an earlier version show nothing until the cache is rebuilt.</td></tr>';
+    if(box) box.style.display = 'none';
+    if(charts.tools){ charts.tools.destroy(); charts.tools = null; }
+    return;
+  }
+  if(box) box.style.display = '';
+
+  tb.innerHTML = '';
+  groups.forEach(function(g){
+    var t = totals[g], disp = groupDisplay(g);
+    var share = totalCalls>0 ? t.calls/totalCalls*100 : 0;
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td style="word-break:break-all">'+esc(disp.full)+'</td>'
+      + '<td>'+n(t.calls)+'</td>' + '<td>'+n(t.sessions)+'</td>'
+      + '<td>'+share.toFixed(0)+'%<div class="bar"><i style="width:'+share.toFixed(0)+'%"></i></div></td>';
+    tb.appendChild(tr);
+  });
+
+  var top = groups.slice(0, 8);
+  if(charts.tools) charts.tools.destroy();
+  if(typeof Chart === 'undefined'){
+    chartFallback('ch_tools', 'Tool usage chart');
+    return;
+  }
+  try {
+    charts.tools = new Chart(canvas, {type:'bar',
+      data:{labels: top.map(function(g){ return groupDisplay(g).short; }),
+        datasets:[{label:'Calls', data: top.map(function(g){ return totals[g].calls; }),
+          backgroundColor:'#003238', borderRadius:4}]},
+      options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false}, title:{display:true, text:'Top connectors, plugins and skills by call count', font:{size:12.5,weight:'600'}, color:'#003238'}},
+        scales:{x:{beginAtZero:true, grid:{color:'#E3E0DE'}},
+                y:{grid:{display:false}, ticks:{font:{size:9}, autoSkip:false}}}}});
+  } catch(e){
+    chartFallback('ch_tools', 'Tool usage chart');
+  }
+}
+
 // ---------- sessions ----------
 function localStamp(iso){
   var d = new Date(iso);
@@ -898,7 +976,7 @@ function bindRefresh(){
 function renderAll(){
   // Each stage runs independently: one broken stage (e.g. a chart library that
   // failed to load) must not blank out the tables that come after it.
-  [renderSubtitle, renderOverview, renderPeriods, renderSessions, renderBasisDetail].forEach(function(fn){
+  [renderSubtitle, renderOverview, renderPeriods, renderSessions, renderTools, renderBasisDetail].forEach(function(fn){
     try { fn(); } catch(e){ console.error('claude-cost-user render stage failed:', fn.name, e); }
   });
 }
@@ -917,7 +995,7 @@ document.getElementById('fx').addEventListener('input', function(){
 // mirrors that proven pattern: "back" lives entirely in an in-memory stack,
 // with a visible Back button and direct handling of the mouse's physical
 // back button. Nothing here touches location.hash or window.history.
-var TAB_IDS = ['overview','months','weeks','days','sessions','how','about'];
+var TAB_IDS = ['overview','months','weeks','days','sessions','tools','how','about'];
 var tabStack = [];
 
 function showTab(id){
@@ -928,6 +1006,12 @@ function showTab(id){
     document.getElementById(tid).classList.toggle('hidden', tid !== id); });
   if(['overview','months','weeks'].indexOf(id) !== -1){
     try{ renderPeriods(); if(id === 'overview') renderOverview(); }catch(e){}
+  }
+  if(id === 'tools'){
+    // Re-render on entry: a chart created while its canvas was hidden
+    // (renderAll at load runs with this tab display:none) sizes to zero.
+    // renderTools destroys any existing chart first, so this is idempotent.
+    try{ renderTools(); }catch(e){}
   }
   return id;
 }

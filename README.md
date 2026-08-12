@@ -4,7 +4,8 @@ Your own Claude usage and cost dashboard, as a portable Windows app or a
 single-file CLI. It reads the session transcripts Cowork and Claude Code
 already write on your machine, prices them, and shows a self-contained HTML
 dashboard: current and previous month, by month, week, day and session, in
-euros.
+euros, plus a Tools tab showing which connectors, plugins and skills your
+sessions actually call.
 
 This is the standalone sibling of the "Claude Cost (User)" Cowork dashboard
 plugin: same data, same dedup rules, same dashboard page, but no Cowork

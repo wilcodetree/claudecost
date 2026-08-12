@@ -11,10 +11,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"os"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -153,7 +155,7 @@ func BuildPayload(cfg *pricing.Config, seat string, cutoff, today time.Time,
 
 	sub := cfg.Subscription
 	return Payload{
-		Schema:      1,
+		Schema:      2, // v0.5.0: added by_tool to agg.Bucket
 		GeneratedAt: time.Now().UTC().Format("2006-01-02T15:04:05") + "+00:00",
 		WindowFrom:  cutoff.Format("2006-01-02"),
 		WindowTo:    today.Format("2006-01-02"),
@@ -206,6 +208,11 @@ type Cache struct {
 	// from here inside that same callback.
 	Sources []string
 	Files   []string
+
+	// DroppedDuplicates is how many sessions the most recent Collect call
+	// removed as cross-session duplicates: the same conversation recorded
+	// under two session IDs, which a forked or resumed session produces.
+	DroppedDuplicates int
 }
 
 // ---------------------------------------------------------------------------
@@ -298,6 +305,32 @@ func (c *Cache) Save(path, fingerprint string) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+// dedupSessions removes the same conversation when it was recorded under
+// two session IDs. The key is five fields already on scan.Session: start,
+// end, call count, output tokens and cache-read tokens. Two genuinely
+// different conversations would need identical start and end timestamps
+// to the millisecond plus identical token counts to collide, so this is
+// safe without any requestId bookkeeping across files. On a collision the
+// session whose SessionID sorts first is kept, so the choice is
+// deterministic across runs and independent of file mtime.
+func dedupSessions(sessions []*scan.Session) ([]*scan.Session, int) {
+	best := map[string]*scan.Session{}
+	for _, s := range sessions {
+		key := s.Start + "|" + s.End + "|" +
+			strconv.FormatInt(s.Calls, 10) + "|" +
+			strconv.FormatInt(s.Out, 10) + "|" +
+			strconv.FormatInt(s.CacheR, 10)
+		if prev, ok := best[key]; !ok || s.SessionID < prev.SessionID {
+			best[key] = s
+		}
+	}
+	kept := make([]*scan.Session, 0, len(best))
+	for _, s := range best {
+		kept = append(kept, s)
+	}
+	return kept, len(sessions) - len(kept)
 }
 
 // Collect resolves sources (the given list, else scan.DefaultSources()),
@@ -430,6 +463,14 @@ func (c *Cache) Collect(cfg *pricing.Config, seat string, monthsN int, sources [
 			sessions = append(sessions, sess)
 		}
 	}
+
+	// Cross-session dedup: a forked or resumed session's child transcript
+	// replays the parent's records, so both parse to identical turn sets
+	// under two different session IDs. dataset owns this pass, not scan,
+	// because scan parses one file at a time and has no business knowing
+	// about the others.
+	sessions, c.DroppedDuplicates = dedupSessions(sessions)
+	log.Printf("dropped %d duplicate session(s)", c.DroppedDuplicates)
 
 	today := time.Now()
 	cutoff := monthStart(today, max(0, monthsN-1))

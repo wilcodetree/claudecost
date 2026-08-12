@@ -28,7 +28,7 @@ import (
 	"claudecost/internal/report"
 )
 
-const version = "0.4.0"
+const version = "0.6.3"
 
 type multiFlag []string
 

@@ -27,25 +27,39 @@ func DefaultSources() []string {
 		add(filepath.Join(home, ".claude", "projects"))
 	}
 
-	// Cowork, packaged (Microsoft Store / MSIX) install
-	if lad := os.Getenv("LOCALAPPDATA"); lad != "" {
-		hits, _ := filepath.Glob(filepath.Join(lad, "Packages", "Claude_*",
-			"LocalCache", "Roaming", "Claude", "local-agent-mode-sessions"))
-		for _, h := range hits {
-			add(h)
+	// The two session folder names Claude Desktop has used. Cowork and Chat
+	// sessions live in local-agent-mode-sessions; a 2026 update moved Desktop
+	// Code sessions to claude-code-sessions (today that folder holds only
+	// sidebar state, the Code transcripts land in ~\.claude\projects via the
+	// embedded CLI runtime, but scan it anyway in case transcripts follow).
+	names := []string{"local-agent-mode-sessions", "claude-code-sessions"}
+
+	for _, name := range names {
+		// Packaged (Microsoft Store / MSIX) install. LocalCache\Roaming is
+		// the package's view of %APPDATA%, LocalCache\Local of %LOCALAPPDATA%.
+		if lad := os.Getenv("LOCALAPPDATA"); lad != "" {
+			for _, mapped := range []string{"Roaming", "Local"} {
+				hits, _ := filepath.Glob(filepath.Join(lad, "Packages", "Claude_*",
+					"LocalCache", mapped, "Claude", name))
+				for _, h := range hits {
+					add(h)
+				}
+			}
+			// Regular install after the documented Roaming-to-Local move.
+			add(filepath.Join(lad, "Claude", name))
 		}
-	}
 
-	// Cowork, regular install
-	if ad := os.Getenv("APPDATA"); ad != "" {
-		add(filepath.Join(ad, "Claude", "local-agent-mode-sessions"))
-	}
+		// Regular install, Roaming (the location current builds use).
+		if ad := os.Getenv("APPDATA"); ad != "" {
+			add(filepath.Join(ad, "Claude", name))
+		}
 
-	if home != "" {
-		// macOS
-		add(filepath.Join(home, "Library", "Application Support", "Claude", "local-agent-mode-sessions"))
-		// Linux
-		add(filepath.Join(home, ".config", "Claude", "local-agent-mode-sessions"))
+		if home != "" {
+			// macOS
+			add(filepath.Join(home, "Library", "Application Support", "Claude", name))
+			// Linux
+			add(filepath.Join(home, ".config", "Claude", name))
+		}
 	}
 	return out
 }
