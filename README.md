@@ -31,7 +31,7 @@ running in the background.
   the exe, so it can run from a read-only share.
 - Launching it a second time brings the existing window to the front instead
   of opening a second copy.
-- Flags: `-interval` (default 30m, floor 5m), `-months` (default 2), `-seat`,
+- Flags: `-interval` (default 15m, floor 5m), `-months` (default 2), `-seat`,
   `-config`, `-source` (repeatable). Same meaning as the CLI flags below.
 - Parsed transcripts are cached in `%LOCALAPPDATA%\claudecost\parsecache.gob`,
   so only the first start (and the first after an update or a config change)

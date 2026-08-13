@@ -54,7 +54,7 @@ func (m *multiFlag) Set(v string) error {
 }
 
 func main() {
-	interval := flag.Duration("interval", 30*time.Minute, "how often to re-read transcripts while the window is open")
+	interval := flag.Duration("interval", 15*time.Minute, "how often to re-read transcripts while the window is open")
 	monthsN := flag.Int("months", 2, "how many months to include, counting the current one")
 	seat := flag.String("seat", "Standard", "your own seat tier (Standard or Premium)")
 	cfgPath := flag.String("config", "", "config file overriding the compiled-in prices and subscription (default: claudecost.json in the app's data folder, if present)")
@@ -167,7 +167,7 @@ func main() {
 			return
 		}
 		if hadDashboard {
-			w.Dispatch(func() { w.Eval("location.reload()") })
+			w.Dispatch(func() { w.Eval("window.ccReload ? ccReload() : location.reload()") })
 			return
 		}
 		fileURL := toFileURL(a.htmlPath)
@@ -181,7 +181,7 @@ func main() {
 				w.Dispatch(func() { w.Eval("window.ccRefreshFailed && window.ccRefreshFailed()") })
 				return
 			}
-			w.Dispatch(func() { w.Eval("location.reload()") })
+			w.Dispatch(func() { w.Eval("window.ccReload ? ccReload() : location.reload()") })
 		}()
 	}); err != nil {
 		log.Println("could not bind ccRefresh:", err)
@@ -197,7 +197,7 @@ func main() {
 				w.Dispatch(func() { w.Eval("window.ccSettingsRebuildFailed && window.ccSettingsRebuildFailed()") })
 				return
 			}
-			w.Dispatch(func() { w.Eval("location.reload()") })
+			w.Dispatch(func() { w.Eval("window.ccReload ? ccReload() : location.reload()") })
 		}()
 		return nil
 	}); err != nil {
@@ -208,13 +208,14 @@ func main() {
 		ticker := time.NewTicker(*interval)
 		defer ticker.Stop()
 		for range ticker.C {
-			built, err := a.rebuild(progressReporter(w))
-			if err != nil {
+			if _, err := a.rebuild(progressReporter(w)); err != nil {
 				log.Println("scheduled collection failed:", err)
 				continue
 			}
-			stamp := built.Format("15:04")
-			w.Dispatch(func() { w.Eval("ccStale('" + stamp + "')") })
+			// Reload the page so the new snapshot shows without a click.
+			// ccReload (app chrome) stashes the active tab first so the
+			// reload lands back on the same tab, not on Overview.
+			w.Dispatch(func() { w.Eval("window.ccReload ? ccReload() : location.reload()") })
 		}
 	}()
 
@@ -524,12 +525,23 @@ const appChromeScript = `
     }
   };
 
-  window.ccStale = function(t){
-    btn.disabled = false;
-    btn.textContent = 'New data ('+t+') – Refresh';
-    btn.style.borderColor = '#FFDD32';
-    btn.style.color = '#FFDD32';
+  // ccReload: reload the page for a fresh snapshot, landing back on the
+  // tab the user was on. Tab state is in-memory only (see template.html's
+  // tab navigation notes), so it is stashed in localStorage across the
+  // reload. Used by the interval ticker, Refresh now, and Settings save.
+  window.ccReload = function(){
+    try{ localStorage.setItem('cc_tab', (typeof currentTab === 'function') ? currentTab() : 'overview'); }catch(e){}
+    location.reload();
   };
+
+  // Restore the stashed tab after a ccReload-driven reload.
+  try{
+    var savedTab = localStorage.getItem('cc_tab');
+    if(savedTab){
+      localStorage.removeItem('cc_tab');
+      if(savedTab !== 'overview' && typeof showTab === 'function') showTab(savedTab);
+    }
+  }catch(e){}
 
   window.ccRefreshFailed = function(){
     btn.disabled = false;
