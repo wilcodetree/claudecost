@@ -482,7 +482,12 @@ function renderOverview(){
   document.getElementById('card_last').setAttribute('data-tip', cardNote);
 
   var ss = D.sessions || [];
-  var thisMonth = cur ? ss.filter(function(s){ return s.start.slice(0,7) === cur; }) : [];
+  // A session belongs to the current month if it was ACTIVE in it, not only
+  // if it started in it: a session started in July that ran into August is
+  // an August session too (see agg.Build's activity-based counting).
+  var thisMonth = cur ? ss.filter(function(s){
+    return s.start.slice(0,7) <= cur && cur <= s.end.slice(0,7);
+  }) : [];
   var top = null;
   thisMonth.forEach(function(s){ if(!top || pick(s) > pick(top)) top = s; });
   document.getElementById('k_top').textContent = cur
@@ -537,8 +542,8 @@ function renderOverview(){
   var share = tc>0 ? lc/tc : 0;
   var avg = thisMonth.length ? tc/thisMonth.length : 0;
   var basisWord = UI.basis === 'sub' ? 'subscription cost' : 'token value';
-  if(!thisMonth.length){
-    msg = '<b>Nothing yet this month.</b> No Cowork or Claude Code sessions since the month began. If you work mainly in the browser, that is expected: those chats leave no local transcript. Check the Real spend tab instead.';
+  if(!(m && m.calls > 0)){
+    msg = '<b>Nothing yet this month.</b> No local Cowork or Claude Code activity since the month began. Cowork sessions that run in Anthropic\'s cloud, and claude.ai browser chats, leave no local transcript and cannot show up here. Check the Real spend tab instead.';
   } else if(share >= 0.45){
     msg = '<b>Session length is your main cost driver.</b> '+Math.round(share*100)+'% of your '+basisWord+' sits in the '+ln+' session'+(ln===1?'':'s')+' that ran past '+(D.long_session_calls||100)+' calls. Splitting those into shorter, single-topic sessions is the one change that would move this number the most.';
   } else if(share >= 0.2){
@@ -796,7 +801,7 @@ function renderSessions(){
   var f = UI.f;
   ss = ss.filter(function(s){
     if(f.surface && s.surface !== f.surface) return false;
-    if(f.month && s.start.slice(0,7) !== f.month) return false;
+    if(f.month && !(s.start.slice(0,7) <= f.month && f.month <= s.end.slice(0,7))) return false;
     if(f.long && !s.long) return false;
     if(f.q && s.title.toLowerCase().indexOf(f.q.toLowerCase()) === -1) return false;
     return true;
@@ -878,7 +883,19 @@ function bindTitleTip(){
 
 function buildFilters(){
   var surfaces = {}, months = {};
-  (D.sessions||[]).forEach(function(s){ surfaces[s.surface] = 1; months[s.start.slice(0,7)] = 1; });
+  // A long-running session should offer every month it touched, not just the
+  // one it started in, so the Month filter matches renderSessions' span test.
+  (D.sessions||[]).forEach(function(s){
+    surfaces[s.surface] = 1;
+    var a = s.start.slice(0,7), b = s.end.slice(0,7) || a;
+    var y = +a.slice(0,4), mo = +a.slice(5,7);
+    for(var guard=0; guard<120; guard++){
+      var k = ('000'+y).slice(-4)+'-'+('0'+mo).slice(-2);
+      months[k] = 1;
+      if(k >= b) break;
+      mo++; if(mo > 12){ mo = 1; y++; }
+    }
+  });
   var fs = document.getElementById('f_surface');
   Object.keys(surfaces).sort().forEach(function(k){
     fs.insertAdjacentHTML('beforeend', '<option value="'+esc(k)+'">'+esc(SL[k]||k)+'</option>'); });

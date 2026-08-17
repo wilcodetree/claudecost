@@ -191,6 +191,11 @@ func main() {
 	go func() {
 		if _, err := a.rebuild(true, progressReporter(w)); err != nil {
 			log.Println("initial collection failed:", err)
+			if !hadDashboard {
+				msg := startupFailureMessage(err)
+				blob, _ := json.Marshal(msg)
+				w.Dispatch(func() { w.Eval("window.ccWarmFail && ccWarmFail(" + string(blob) + ")") })
+			}
 			return
 		}
 		if hadDashboard {
@@ -290,6 +295,26 @@ func main() {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// startupFailureMessage turns a Collect error from the very first pass (no
+// dashboard.html yet to fall back on) into plain text for the warming page.
+// Before this, any of these three errors was logged and then silently
+// swallowed, leaving the window stuck on "Reading your session
+// transcripts... Starting..." forever: exactly what a chat-only user, or
+// anyone whose Cowork sessions all run in Anthropic's cloud, hits, since
+// neither leaves a local transcript for this machine to find.
+func startupFailureMessage(err error) string {
+	switch {
+	case errors.Is(err, dataset.ErrNoSources):
+		return "No Claude transcript folders were found on this machine. Cowork sessions that run in Anthropic's cloud leave no local transcript, so there may be nothing local to read yet."
+	case errors.Is(err, dataset.ErrNoFiles):
+		return "Claude's folders exist but contain no transcript files. Cloud Cowork sessions and claude.ai browser chats leave no local transcript."
+	case errors.Is(err, dataset.ErrNoSessions):
+		return "Transcripts were found, but none with usage inside the reporting window."
+	default:
+		return "Could not read usage data: " + err.Error()
+	}
 }
 
 // progressReporter turns a Collect-shaped (done,total) callback into live
@@ -547,6 +572,12 @@ function ccProgress(done,total,eta){
   if(fill) fill.style.width = pct+'%';
   var t = document.getElementById('cc_warm_text');
   if(t) t.textContent = done+' / '+total+' files ('+pct+'%)'+(eta!=null && eta>0 ? ', about '+eta+'s left' : '');
+}
+function ccWarmFail(msg){
+  var t = document.getElementById('cc_warm_text');
+  if(t){ t.textContent = msg; t.style.color = '#ff8a65'; }
+  var f = document.getElementById('cc_warm_fill');
+  if(f) f.style.background = '#ff8a65';
 }
 </script>
 </body>`
@@ -832,9 +863,18 @@ func appDataDir() string {
 	return filepath.Join(os.TempDir(), "claudecost")
 }
 
+// setupLog opens the app's log file in append mode, rotating it out of the
+// way first if it has grown past 512KB. Truncating on every start (the
+// previous behaviour) destroyed the previous run's trail on every restart,
+// including the "another instance already running" case, which exits before
+// logging anything else: exactly the log a "my dashboard is stuck / shows no
+// data" report needs to diagnose from app.log alone.
 func setupLog(dataDir string) {
-	f, err := os.OpenFile(filepath.Join(dataDir, "claudecost-app.log"),
-		os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	path := filepath.Join(dataDir, "claudecost-app.log")
+	if fi, err := os.Stat(path); err == nil && fi.Size() > 512*1024 {
+		_ = os.Rename(path, path+".1")
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return
 	}

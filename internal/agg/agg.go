@@ -116,28 +116,34 @@ type target struct {
 	m   map[string]*Bucket
 }
 
-// Build aggregates sessions starting on or after cutoff into month, week and
-// day buckets, and returns the kept sessions newest first.
+// Build aggregates sessions with any activity on or after cutoff into month,
+// week and day buckets, and returns the kept sessions newest first.
+//
+// Attribution rules, deliberately different per metric:
+//   - Calls, tokens and cost go to the day (and its month and week) each call
+//     actually ran, so sessions spanning midnight or a month edge split
+//     correctly.
+//   - Sessions on a bucket means "sessions active in this bucket": a session
+//     counts once in every month, week and day it had at least one call in.
+//     A July-started session still running in August is an August session
+//     too. Per-bucket session counts therefore do not sum to the total.
+//   - Model and tool splits and the token composition stay whole-session,
+//     attributed to the session's first in-window activity day, month and
+//     week: splitting them per call would need per-call model data the
+//     session cache does not carry.
 func Build(sessions []*scan.Session, cutoff time.Time) (months, weeks, days map[string]*Bucket, kept []*scan.Session) {
 	months, weeks, days = map[string]*Bucket{}, map[string]*Bucket{}, map[string]*Bucket{}
 
 	for _, s := range sessions {
-		if len(s.Start) < 10 {
+		if len(s.Start) < 10 || len(s.End) < 10 {
 			continue
 		}
-		sd, ok := parseDay(s.Start[:10])
-		if !ok || sd.Before(cutoff) {
+		if _, ok := parseDay(s.Start[:10]); !ok {
 			continue
 		}
-		kept = append(kept, s)
-
-		// Session-level attribution goes to the day it started; the per-day
-		// buckets below use each call's own date so a session that spans
-		// midnight is split correctly.
-		for _, t := range []target{{monthKey(sd), months}, {weekKey(sd), weeks}} {
-			b := get(t.m, t.key)
-			b.Sessions++
-			b.surf(s.Surface).Sessions++
+		ed, ok := parseDay(s.End[:10])
+		if !ok || ed.Before(cutoff) {
+			continue // all activity ended before the window opened
 		}
 
 		dayKeys := make([]string, 0, len(s.Daily))
@@ -146,13 +152,22 @@ func Build(sessions []*scan.Session, cutoff time.Time) (months, weeks, days map[
 		}
 		sort.Strings(dayKeys)
 
+		firstDay := ""
+		seenMonth := map[string]bool{}
+		seenWeek := map[string]bool{}
+
 		for _, daystr := range dayKeys {
 			dv := s.Daily[daystr]
 			dd, ok := parseDay(daystr)
 			if !ok || dd.Before(cutoff) {
 				continue
 			}
-			for _, t := range []target{{monthKey(dd), months}, {weekKey(dd), weeks}, {daystr, days}} {
+			if firstDay == "" {
+				firstDay = daystr
+			}
+			mk, wk := monthKey(dd), weekKey(dd)
+
+			for _, t := range []target{{mk, months}, {wk, weeks}, {daystr, days}} {
 				b := get(t.m, t.key)
 				b.Calls += dv.Calls
 				b.Tokens += dv.Tokens
@@ -164,20 +179,33 @@ func Build(sessions []*scan.Session, cutoff time.Time) (months, weeks, days map[
 				bs.Cost += dv.Cost
 				bs.CostSub += dv.CostSub
 			}
-		}
 
-		// Day buckets need a session count too, on the session's first day.
-		firstDay := ""
-		if len(dayKeys) > 0 {
-			firstDay = dayKeys[0]
-		}
-		if firstDay != "" {
-			if fd, ok := parseDay(firstDay); ok && !fd.Before(cutoff) {
-				b := get(days, firstDay)
-				b.Sessions++
-				b.surf(s.Surface).Sessions++
+			// Activity-based session counts: once per day, once per distinct
+			// month and week.
+			db := get(days, daystr)
+			db.Sessions++
+			db.surf(s.Surface).Sessions++
+			if !seenMonth[mk] {
+				seenMonth[mk] = true
+				mb := get(months, mk)
+				mb.Sessions++
+				mb.surf(s.Surface).Sessions++
+			}
+			if !seenWeek[wk] {
+				seenWeek[wk] = true
+				wb := get(weeks, wk)
+				wb.Sessions++
+				wb.surf(s.Surface).Sessions++
 			}
 		}
+
+		if firstDay == "" {
+			continue // no in-window activity at all
+		}
+		kept = append(kept, s)
+
+		fd, _ := parseDay(firstDay)
+		targets := []target{{monthKey(fd), months}, {weekKey(fd), weeks}, {firstDay, days}}
 
 		// Model split, whole-session granularity.
 		mkeys := make([]string, 0, len(s.Models))
@@ -185,10 +213,6 @@ func Build(sessions []*scan.Session, cutoff time.Time) (months, weeks, days map[
 			mkeys = append(mkeys, k)
 		}
 		sort.Strings(mkeys)
-		targets := []target{{monthKey(sd), months}, {weekKey(sd), weeks}}
-		if firstDay != "" {
-			targets = append(targets, target{firstDay, days})
-		}
 		for _, t := range targets {
 			b := get(t.m, t.key)
 			for _, mn := range mkeys {
@@ -227,8 +251,8 @@ func Build(sessions []*scan.Session, cutoff time.Time) (months, weeks, days map[
 			}
 		}
 
-		// Token composition, attributed to the start month and week.
-		for _, t := range []target{{monthKey(sd), months}, {weekKey(sd), weeks}} {
+		// Token composition, attributed to the first in-window month and week.
+		for _, t := range []target{{monthKey(fd), months}, {weekKey(fd), weeks}} {
 			b := get(t.m, t.key)
 			b.Fresh += s.Fresh
 			b.CacheW += s.CacheW

@@ -29,9 +29,10 @@ import (
 
 // CoverageNote explains what claudecost can and cannot see. Unchanged from
 // v0.1.0.
-const CoverageNote = "Cowork and Claude Code only, from this machine. claude.ai browser and " +
-	"mobile chats keep no local transcript and are deliberately not collected: the only " +
-	"source for those would be an organisation-wide export of everyone's activity."
+const CoverageNote = "Local Cowork and Claude Code sessions only, from this machine. Cowork " +
+	"sessions that run in Anthropic's cloud, claude.ai browser chats and mobile chats keep " +
+	"no local transcript and are deliberately not collected: the only source for those " +
+	"would be an organisation-wide export (Compliance API / OpenTelemetry)."
 
 // Distinct errors Collect can return. Callers map each to their own message
 // and exit code.
