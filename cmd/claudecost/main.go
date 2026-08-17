@@ -88,7 +88,17 @@ func run() int {
 		}
 	}
 
-	payload, err := cache.Collect(&cfg, *seat, *monthsN, []string(sources), progress)
+	// A one-shot run always does a full pass: there is no ticker here to
+	// spread the WSL cost over, so RefreshSlow is always true. See "Two
+	// refresh cadences" in docs/2026-08-17_wsl-source-detection-design.md,
+	// which only applies to the app's own interval tickers.
+	opts := dataset.CollectOpts{
+		Seat:        *seat,
+		MonthsN:     *monthsN,
+		Sources:     []string(sources),
+		RefreshSlow: true,
+	}
+	payload, err := cache.Collect(&cfg, opts, progress)
 	if err == nil && !*noCache {
 		if mkErr := os.MkdirAll(filepath.Dir(cachePath), 0o755); mkErr == nil {
 			if saveErr := cache.Save(cachePath, fingerprint); saveErr != nil && !*quiet {

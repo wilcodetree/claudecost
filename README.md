@@ -31,8 +31,10 @@ running in the background.
   the exe, so it can run from a read-only share.
 - Launching it a second time brings the existing window to the front instead
   of opening a second copy.
-- Flags: `-interval` (default 15m, floor 5m), `-months` (default 2), `-seat`,
-  `-config`, `-source` (repeatable). Same meaning as the CLI flags below.
+- Flags: `-interval` (default 15m, floor 5m), `-wsl-interval` (how often to
+  re-read WSL transcripts specifically, default 4h, floor 15m; see "WSL"
+  below), `-months` (default 2), `-seat`, `-config`, `-source` (repeatable).
+  Same meaning as the CLI flags below.
 - Parsed transcripts are cached in `%LOCALAPPDATA%\claudecost\parsecache.gob`,
   so only the first start (and the first after an update or a config change)
   reads every transcript; later starts show the previous dashboard right
@@ -67,7 +69,7 @@ Reports land in a `reports` folder next to the exe if writable, otherwise in
 
 - Finds transcripts in the known locations (Claude Code `~\.claude\projects`,
   Cowork under `%APPDATA%` or the MSIX `%LOCALAPPDATA%\Packages` path, plus
-  the macOS and Linux equivalents).
+  the macOS and Linux equivalents, plus WSL, see "WSL" below).
 - Deduplicates streamed API calls (one entry per requestId, largest
   output_tokens), drops synthetic turns, and prices every call two ways:
   subscription share (what a flat monthly plan actually costs, allocated by
@@ -78,6 +80,44 @@ Reports land in a `reports` folder next to the exe if writable, otherwise in
 Coverage is Cowork and Claude Code only. claude.ai in the browser keeps no
 local transcript, so it cannot appear here; check claude.ai/settings/usage
 for those limit bars instead.
+
+## WSL
+
+Claude Code running inside a WSL distribution (Ubuntu under WSL, most
+commonly) is a Linux process with a Linux `$HOME`, so its transcripts live
+inside the distro, not under any Windows folder. As of v0.7.0 claudecost
+finds them automatically: it reads which WSL distributions are installed
+from the registry, then looks for each one's `.claude/projects` folder,
+including one moved via a `CLAUDE_CONFIG_DIR` set in a shell startup file.
+
+A few things are worth knowing:
+
+- Reading Linux files from Windows goes over WSL's own file-sharing layer
+  and is slower than reading a native NTFS folder, so a scan that includes
+  WSL can take longer than one that does not. To keep this from slowing down
+  the app's regular refresh, WSL transcripts are re-read on their own,
+  slower clock (`-wsl-interval`, default 4 hours) while native Windows
+  transcripts keep the normal 15-minute one. Refresh now and saving Settings
+  always re-read everything, WSL included. When WSL data is present, the
+  header notice at the top of the dashboard states both cadences, and a
+  small "WSL data as of HH:MM" stamp next to the main snapshot time shows
+  how current the WSL half actually is.
+- Accessing a stopped WSL 2 distribution's files can start it in the
+  background, which costs a few seconds and some memory. This only happens
+  on the slower WSL cadence above, not on every 15-minute refresh.
+- To turn WSL scanning off entirely, set `"wsl_scan": "off"` in
+  `claudecost.json`. This is also the first thing to try if a scan seems
+  slow and you want to rule WSL out.
+- If detection misses a distro, or a config directory set somewhere other
+  than a shell startup file (a systemd unit, a wrapper script, an IDE launch
+  config), add the folder directly with `"extra_sources": ["..."]` in
+  `claudecost.json`, or with a repeatable `-source` flag. Unlike `-source`
+  on its own, `extra_sources` adds to auto-detection rather than replacing
+  it.
+- A native Windows install with a moved `CLAUDE_CONFIG_DIR` is also picked
+  up now, independent of WSL.
+
+See `claudecost.example.json` for the exact config keys.
 
 ## Build
 
@@ -105,8 +145,9 @@ everything.
 
 Or edit the file directly, useful for the CLI, for scripting, or for
 anything outside the subscription block, such as an unusual per-model price
-override: drop a `claudecost.json` next to the exe (CLI) or pass `-config`
-(app), overriding any subset of the defaults. See `claudecost.example.json`.
+override or the WSL settings described above: drop a `claudecost.json` next
+to the exe (CLI) or pass `-config` (app), overriding any subset of the
+defaults. See `claudecost.example.json`.
 The recommended calibration source is your real invoice total divided by
 consumption, not seats times list price, since a flat subscription rarely
 maps cleanly to per-seat usage.

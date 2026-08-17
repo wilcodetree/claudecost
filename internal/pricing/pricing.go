@@ -45,6 +45,27 @@ type Config struct {
 	FallbackFamily string                `json:"fallback_family"`
 	Prices         map[string]ModelPrice `json:"prices"`
 	Subscription   Subscription          `json:"subscription"`
+
+	// WSLScan controls whether source detection is allowed to probe WSL
+	// distributions for Claude Code transcripts. "auto" (the default, same
+	// as an empty string) scans; "off" skips it entirely, and is the first
+	// thing to flip when diagnosing a slow scan. Any other value is a config
+	// error caught at load time.
+	WSLScan string `json:"wsl_scan"`
+
+	// ExtraSources is appended to whatever auto-detection (or an explicit
+	// -source override) already found, deduplicated afterwards. Unlike
+	// -source, which replaces auto-detection, this is additive: the escape
+	// hatch for a distro registered under a different Windows account, a
+	// CLAUDE_CONFIG_DIR set somewhere detection does not look (a systemd
+	// unit, a wrapper script, an IDE launch config), or a path on a network
+	// share.
+	ExtraSources []string `json:"extra_sources"`
+
+	// WSLIntervalHours sets the slow (WSL) refresh cadence in the app, in
+	// hours; zero or absent means the compiled-in 4-hour default. The app's
+	// -wsl-interval flag wins over this when both are present.
+	WSLIntervalHours float64 `json:"wsl_interval_hours"`
 }
 
 // Defaults mirrors the PRICES and SUBSCRIPTION blocks of
@@ -78,7 +99,17 @@ func Defaults() Config {
 			CalibratedOn:              "example",
 			Window:                    "example",
 		},
+		// WSLScan, ExtraSources and WSLIntervalHours are left at their zero
+		// values here: "" means auto-scan, nil means nothing extra, 0 means
+		// the compiled-in 4-hour WSL cadence, all identical to today's
+		// behaviour for anyone who has never heard of WSL detection.
 	}
+}
+
+// validWSLScan reports whether v is an accepted value for wsl_scan: "" and
+// "auto" both mean the default (scan), "off" disables it.
+func validWSLScan(v string) bool {
+	return v == "" || v == "auto" || v == "off"
 }
 
 // Load returns the defaults with any fields present in the JSON file at path
@@ -94,6 +125,9 @@ func Load(path string) (Config, error) {
 	}
 	if err := json.Unmarshal(b, &cfg); err != nil {
 		return cfg, fmt.Errorf("%s: %w", path, err)
+	}
+	if !validWSLScan(cfg.WSLScan) {
+		return cfg, fmt.Errorf("%s: wsl_scan %q is not valid, use \"auto\" or \"off\"", path, cfg.WSLScan)
 	}
 	return cfg, nil
 }

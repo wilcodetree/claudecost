@@ -30,13 +30,15 @@ import (
 	"claudecost/internal/dataset"
 	"claudecost/internal/pricing"
 	"claudecost/internal/report"
+	"claudecost/internal/scan"
 )
 
 const (
-	version     = "0.6.3"
-	windowTitle = "Claude Cost"
-	mutexName   = `Local\claudecost-app`
-	minInterval = 5 * time.Minute
+	version        = "0.7.0"
+	windowTitle    = "Claude Cost"
+	mutexName      = `Local\claudecost-app`
+	minInterval    = 5 * time.Minute
+	minWSLInterval = 15 * time.Minute
 )
 
 func init() {
@@ -55,6 +57,7 @@ func (m *multiFlag) Set(v string) error {
 
 func main() {
 	interval := flag.Duration("interval", 15*time.Minute, "how often to re-read transcripts while the window is open")
+	wslInterval := flag.Duration("wsl-interval", 4*time.Hour, "how often to re-read WSL transcripts while the window is open (native transcripts stay on -interval)")
 	monthsN := flag.Int("months", 2, "how many months to include, counting the current one")
 	seat := flag.String("seat", "Standard", "your own seat tier (Standard or Premium)")
 	cfgPath := flag.String("config", "", "config file overriding the compiled-in prices and subscription (default: claudecost.json in the app's data folder, if present)")
@@ -65,6 +68,17 @@ func main() {
 	if *interval < minInterval {
 		*interval = minInterval
 	}
+
+	// -wsl-interval wins over wsl_interval_hours in config; whether it was
+	// actually passed (as opposed to sitting at its flag default) is only
+	// knowable via flag.Visit, since flag.Duration itself cannot tell "not
+	// set" from "set to the default".
+	wslIntervalFlagSet := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "wsl-interval" {
+			wslIntervalFlagSet = true
+		}
+	})
 
 	dataDir := appDataDir()
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
@@ -96,6 +110,17 @@ func main() {
 		log.Println("using config overrides from", cfgFile)
 	}
 
+	// Zero or absent config value means the flag's own 4h default, whether
+	// or not the flag was explicitly passed.
+	effectiveWSLInterval := *wslInterval
+	if !wslIntervalFlagSet && cfg.WSLIntervalHours > 0 {
+		effectiveWSLInterval = time.Duration(cfg.WSLIntervalHours * float64(time.Hour))
+	}
+	if effectiveWSLInterval < minWSLInterval {
+		effectiveWSLInterval = minWSLInterval
+	}
+	wslEnabled := cfg.WSLScan != "off"
+
 	cachePath := filepath.Join(dataDir, "parsecache.gob")
 	fingerprint := dataset.Fingerprint(version, &cfg)
 
@@ -123,6 +148,7 @@ func main() {
 		sources:     []string(sources),
 		htmlPath:    filepath.Join(dataDir, "dashboard.html"),
 		interval:    *interval,
+		wslInterval: effectiveWSLInterval,
 		cachePath:   cachePath,
 		fingerprint: fingerprint,
 		cfgPath:     cfgSavePath,
@@ -160,9 +186,10 @@ func main() {
 	// First collection happens off the UI goroutine so the page already on
 	// screen (warming or the stale dashboard) can paint immediately. With a
 	// warm parse cache this finishes in seconds, well before anyone digs
-	// into a tab.
+	// into a tab. Startup always does a full pass, WSL included: see "Two
+	// refresh cadences" in docs/2026-08-17_wsl-source-detection-design.md.
 	go func() {
-		if _, err := a.rebuild(progressReporter(w)); err != nil {
+		if _, err := a.rebuild(true, progressReporter(w)); err != nil {
 			log.Println("initial collection failed:", err)
 			return
 		}
@@ -174,13 +201,34 @@ func main() {
 		w.Dispatch(func() { w.Navigate(fileURL) })
 	}()
 
+	// wslTicker drives the slow (WSL) cadence; nil when wsl_scan is off, so
+	// that case never even starts a background timer for it. resetWSLTicker
+	// is what "Refresh now and Settings-save reset it" (Two refresh
+	// cadences) means in practice: without this, pressing Refresh right
+	// before the four-hour mark would still trigger a second full WSL walk
+	// moments later.
+	var wslTicker *time.Ticker
+	var tickerMu sync.Mutex
+	if wslEnabled {
+		wslTicker = time.NewTicker(a.wslInterval)
+	}
+	resetWSLTicker := func() {
+		if wslTicker == nil {
+			return
+		}
+		tickerMu.Lock()
+		wslTicker.Reset(a.wslInterval)
+		tickerMu.Unlock()
+	}
+
 	if err := w.Bind("ccRefresh", func() {
 		go func() {
-			if _, err := a.rebuild(progressReporter(w)); err != nil {
+			if _, err := a.rebuild(true, progressReporter(w)); err != nil {
 				log.Println("refresh failed:", err)
 				w.Dispatch(func() { w.Eval("window.ccRefreshFailed && window.ccRefreshFailed()") })
 				return
 			}
+			resetWSLTicker()
 			w.Dispatch(func() { w.Eval("window.ccReload ? ccReload() : location.reload()") })
 		}()
 	}); err != nil {
@@ -192,11 +240,12 @@ func main() {
 			return err
 		}
 		go func() {
-			if _, err := a.rebuild(progressReporter(w)); err != nil {
+			if _, err := a.rebuild(true, progressReporter(w)); err != nil {
 				log.Println("rebuild after settings save failed:", err)
 				w.Dispatch(func() { w.Eval("window.ccSettingsRebuildFailed && window.ccSettingsRebuildFailed()") })
 				return
 			}
+			resetWSLTicker()
 			w.Dispatch(func() { w.Eval("window.ccReload ? ccReload() : location.reload()") })
 		}()
 		return nil
@@ -208,7 +257,10 @@ func main() {
 		ticker := time.NewTicker(*interval)
 		defer ticker.Stop()
 		for range ticker.C {
-			if _, err := a.rebuild(progressReporter(w)); err != nil {
+			// The 15-minute (or whatever -interval is) tier never touches
+			// WSL: RefreshSlow false, so Collect reuses the last full
+			// pass's slow-tier file list instead of walking it again.
+			if _, err := a.rebuild(false, progressReporter(w)); err != nil {
 				log.Println("scheduled collection failed:", err)
 				continue
 			}
@@ -218,6 +270,19 @@ func main() {
 			w.Dispatch(func() { w.Eval("window.ccReload ? ccReload() : location.reload()") })
 		}
 	}()
+
+	if wslTicker != nil {
+		go func() {
+			defer wslTicker.Stop()
+			for range wslTicker.C {
+				if _, err := a.rebuild(true, progressReporter(w)); err != nil {
+					log.Println("scheduled WSL collection failed:", err)
+					continue
+				}
+				w.Dispatch(func() { w.Eval("window.ccReload ? ccReload() : location.reload()") })
+			}
+		}()
+	}
 
 	w.Run()
 }
@@ -251,23 +316,26 @@ func progressReporter(w webview2.WebView) func(done, total int) {
 }
 
 // ---------------------------------------------------------------------------
-// app: the one rebuild path shared by startup, the ticker and Refresh now
+// app: the one rebuild path shared by startup, both tickers, Refresh now and
+// Settings save
 // ---------------------------------------------------------------------------
 
 type app struct {
-	cfg      pricing.Config
-	seat     string
-	monthsN  int
-	sources  []string
+	cfg         pricing.Config
+	seat        string
+	monthsN     int
+	sources     []string
 	htmlPath    string
 	interval    time.Duration
+	wslInterval time.Duration
 	cachePath   string
 	fingerprint string
 	cfgPath     string
 
-	cache    dataset.Cache
-	mu       sync.Mutex
-	building atomic.Bool
+	cache      dataset.Cache
+	wslDistros []string
+	mu         sync.Mutex
+	building   atomic.Bool
 }
 
 var errRebuildBusy = errors.New("a collection is already running")
@@ -276,7 +344,13 @@ var errRebuildBusy = errors.New("a collection is already running")
 // through progress if non-nil. It is guarded so only one collection runs at
 // a time; a call that lands while another is already in flight (a tick
 // firing mid-refresh) is skipped, not queued, and reports errRebuildBusy.
-func (a *app) rebuild(progress func(done, total int)) (time.Time, error) {
+//
+// refreshSlow is threaded straight through to dataset.CollectOpts.
+// RefreshSlow: true means this pass is allowed to (re)resolve and walk WSL
+// sources, false means it must not touch WSL at all and instead reuses
+// whatever the last true pass found. See "Two refresh cadences" in
+// docs/2026-08-17_wsl-source-detection-design.md.
+func (a *app) rebuild(refreshSlow bool, progress func(done, total int)) (time.Time, error) {
 	if !a.building.CompareAndSwap(false, true) {
 		return time.Time{}, errRebuildBusy
 	}
@@ -285,10 +359,20 @@ func (a *app) rebuild(progress func(done, total int)) (time.Time, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	payload, err := a.cache.Collect(&a.cfg, a.seat, a.monthsN, a.sources, progress)
+	opts := dataset.CollectOpts{
+		Seat:        a.seat,
+		MonthsN:     a.monthsN,
+		Sources:     a.sources,
+		RefreshSlow: refreshSlow,
+	}
+	payload, err := a.cache.Collect(&a.cfg, opts, progress)
 	if err != nil {
 		return time.Time{}, err
 	}
+	// Reflects whatever the most recent WSL probe (if any ran this pass, or
+	// the last pass that did) actually found; empty when WSL is off, not
+	// installed, or found nothing.
+	a.wslDistros = scan.WSLDistroNames()
 	logSourceScan(a.cache.Sources, a.cache.Files)
 	blob, err := json.Marshal(payload)
 	if err != nil {
@@ -304,10 +388,10 @@ func (a *app) rebuild(progress func(done, total int)) (time.Time, error) {
 	if err := os.WriteFile(a.htmlPath, []byte(html), 0o600); err != nil {
 		return time.Time{}, err
 	}
-	// Persisted for every trigger (startup, the interval ticker, Refresh
-	// now) since they all share this one rebuild path. A save failure never
-	// fails the rebuild itself: the dashboard already wrote fine, and the
-	// next run just falls back to a full re-parse.
+	// Persisted for every trigger (startup, both tickers, Refresh now,
+	// Settings save) since they all share this one rebuild path. A save
+	// failure never fails the rebuild itself: the dashboard already wrote
+	// fine, and the next run just falls back to a full re-parse.
 	if err := a.cache.Save(a.cachePath, a.fingerprint); err != nil {
 		log.Println("could not save parse cache:", err)
 	}
@@ -360,13 +444,14 @@ type settingsPayload struct {
 }
 
 // applySettings writes p to claudecost.json (preserving any other keys
-// already in that file, such as an unusual Prices override), then updates
-// the running config and seat in memory. It resets the parse cache outright
-// rather than just bumping the fingerprint: every already-cached session
-// carries costs computed with the old Subscription, and there is no cheap
-// way to tell which ones actually changed, so the honest fix is to treat
-// this exactly like a version or config-file change and re-parse
-// everything. The caller triggers the actual rebuild afterward.
+// already in that file, such as an unusual Prices override or the wsl_scan
+// / extra_sources fields), then updates the running config and seat in
+// memory. It resets the parse cache outright rather than just bumping the
+// fingerprint: every already-cached session carries costs computed with the
+// old Subscription, and there is no cheap way to tell which ones actually
+// changed, so the honest fix is to treat this exactly like a version or
+// config-file change and re-parse everything. The caller triggers the
+// actual rebuild afterward.
 func (a *app) applySettings(p settingsPayload) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -400,11 +485,11 @@ func (a *app) applySettings(p settingsPayload) error {
 
 // writeSubscriptionConfig merges sub into the "subscription" key of the
 // JSON file at path, leaving any other keys (an unusual Prices override,
-// say) exactly as they were. A missing or unreadable existing file is
-// treated as empty, not an error: this is very likely the first time
-// anyone has saved settings from the window. Written via a .tmp file plus
-// os.Rename, same pattern as the parse cache, so a crash mid-write never
-// corrupts the real file.
+// wsl_scan, extra_sources) exactly as they were. A missing or unreadable
+// existing file is treated as empty, not an error: this is very likely the
+// first time anyone has saved settings from the window. Written via a .tmp
+// file plus os.Rename, same pattern as the parse cache, so a crash
+// mid-write never corrupts the real file.
 func writeSubscriptionConfig(path string, sub pricing.Subscription) error {
 	raw := map[string]json.RawMessage{}
 	if b, err := os.ReadFile(path); err == nil {
@@ -472,9 +557,32 @@ func warmingPageHTML() string {
 
 const cliRebuildNotice = `<b>This page is rebuilt every time you run claudecost.exe.</b> It reads your session transcripts live at each run, so refreshing is simply running it again: a new report is written and opened for you.`
 
-func appRebuildNotice(interval time.Duration) string {
-	return fmt.Sprintf(`<b>This window keeps itself current.</b> It opens straight to your last snapshot and quietly catches up in the background within moments. It also re-reads your session transcripts every %d minutes while open, whenever you press Refresh now (top right), and right after you save changes in Settings (the gear icon).`,
-		int(interval/time.Minute))
+// appRebuildNotice produces the app window's "how this stays current" text.
+// With no WSL distros found, it reproduces today's single-cadence wording
+// byte for byte. With WSL distros found, it names them and states both
+// cadences, since the "Snapshot taken" stamp would otherwise read as more
+// current than the WSL half of the numbers actually is.
+func appRebuildNotice(interval, wslInterval time.Duration, wslDistros []string) string {
+	if len(wslDistros) == 0 {
+		return fmt.Sprintf(`<b>This window keeps itself current.</b> It opens straight to your last snapshot and quietly catches up in the background within moments. It also re-reads your session transcripts every %d minutes while open, whenever you press Refresh now (top right), and right after you save changes in Settings (the gear icon).`,
+			int(interval/time.Minute))
+	}
+	names := strings.Join(wslDistros, ", ")
+	return fmt.Sprintf(`<b>This window keeps itself current.</b> It opens straight to your last snapshot and quietly catches up in the background within moments. Windows transcripts are re-read every %d minutes while open. WSL transcripts (%s) are re-read every %s, because reading Linux files from Windows is slow. Refresh now (top right) and saving Settings re-read everything, WSL included.`,
+		int(interval/time.Minute), names, formatHours(wslInterval))
+}
+
+// formatHours renders a duration the way the header text wants it: whole
+// hours as "N hour(s)", anything else as minutes.
+func formatHours(d time.Duration) string {
+	if d > 0 && d%time.Hour == 0 {
+		h := int(d / time.Hour)
+		if h == 1 {
+			return "1 hour"
+		}
+		return fmt.Sprintf("%d hours", h)
+	}
+	return fmt.Sprintf("%d minutes", int(d/time.Minute))
 }
 
 // stampAnchor is the exact markup template.html renders for the "Snapshot
@@ -485,8 +593,15 @@ func appRebuildNotice(interval time.Duration) string {
 const stampAnchor = `<div class="stamp" id="stamp"></div>`
 
 func (a *app) stampAreaHTML() string {
+	wslStamp := ""
+	if len(a.wslDistros) > 0 && !a.cache.SlowScannedAt.IsZero() {
+		wslStamp = ` <span style="color:var(--pine-40);font-size:11px;opacity:.75;white-space:nowrap" title="WSL transcripts are re-read on a slower, ` +
+			formatHours(a.wslInterval) +
+			` cycle because reading Linux files from Windows is slow; native Windows transcripts are current as of the main snapshot time.">WSL data as of ` +
+			a.cache.SlowScannedAt.Format("15:04") + `</span>`
+	}
 	return `<div style="display:flex;align-items:center;gap:12px">
- <span style="color:var(--pine-40);font-size:11px;opacity:.75;white-space:nowrap">v` + version + `</span>
+ <span style="color:var(--pine-40);font-size:11px;opacity:.75;white-space:nowrap">v` + version + `</span>` + wslStamp + `
  <span id="cc_progress" style="display:none;color:var(--pine-40);font-size:12px;white-space:nowrap"></span>
  <button id="cc_settings_btn" title="Subscription settings" style="padding:6px 10px;border:1px solid var(--pine-40);border-radius:6px;background:transparent;color:#fff;font:14px 'Inter','Segoe UI',sans-serif;cursor:pointer;white-space:nowrap">&#9881;</button>
  <button id="cc_btn" style="padding:6px 12px;border:1px solid var(--pine-40);border-radius:6px;background:transparent;color:#fff;font:13px 'Inter','Segoe UI',sans-serif;cursor:pointer;white-space:nowrap">Refresh now</button>
@@ -528,7 +643,7 @@ const appChromeScript = `
   // ccReload: reload the page for a fresh snapshot, landing back on the
   // tab the user was on. Tab state is in-memory only (see template.html's
   // tab navigation notes), so it is stashed in localStorage across the
-  // reload. Used by the interval ticker, Refresh now, and Settings save.
+  // reload. Used by both interval tickers, Refresh now, and Settings save.
   window.ccReload = function(){
     try{ localStorage.setItem('cc_tab', (typeof currentTab === 'function') ? currentTab() : 'overview'); }catch(e){}
     location.reload();
@@ -564,7 +679,7 @@ func (a *app) applyAppChrome(html string) string {
 	if n := strings.Count(html, cliRebuildNotice); n != 1 {
 		log.Printf("warning: rebuild notice found %d times in the rendered template, expected 1", n)
 	}
-	html = strings.Replace(html, cliRebuildNotice, appRebuildNotice(a.interval), 1)
+	html = strings.Replace(html, cliRebuildNotice, appRebuildNotice(a.interval, a.wslInterval, a.wslDistros), 1)
 
 	if n := strings.Count(html, stampAnchor); n != 1 {
 		log.Printf("warning: snapshot stamp found %d times in the rendered template, expected 1; Refresh now not placed", n)
@@ -770,7 +885,7 @@ const (
 // missing the WebView2 runtime: collect once, open the result in the
 // default browser, and say why there is no app window.
 func runWithoutWindow(a *app) {
-	if _, err := a.rebuild(nil); err != nil {
+	if _, err := a.rebuild(true, nil); err != nil {
 		log.Println("fallback collection failed:", err)
 	}
 	openInBrowser(a.htmlPath)

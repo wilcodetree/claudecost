@@ -209,6 +209,18 @@ type Cache struct {
 	Sources []string
 	Files   []string
 
+	// SlowFiles is the file list found under the slow (WSL) sources on the
+	// most recent pass that actually walked them (a Collect call with
+	// RefreshSlow true). A pass with RefreshSlow false reuses this list
+	// instead of re-walking the WSL sources, and Collect skips the
+	// mtime/size stat for any of these files that already has a cache
+	// entry, since a stat over the WSL 9P file server is exactly the round
+	// trip the slow cadence exists to avoid. In memory only: a restart
+	// always does a full pass before the first render, so nothing here is
+	// worth persisting in the gob.
+	SlowFiles     []string
+	SlowScannedAt time.Time
+
 	// DroppedDuplicates is how many sessions the most recent Collect call
 	// removed as cross-session duplicates: the same conversation recorded
 	// under two session IDs, which a forked or resumed session produces.
@@ -240,9 +252,16 @@ type diskCache struct {
 
 // Fingerprint identifies everything that invalidates cached parse results:
 // the app version (parse logic may change between releases) and the pricing
-// config (cached sessions store computed costs).
+// config (cached sessions store computed costs). WSLScan, ExtraSources and
+// WSLIntervalHours are zeroed on a copy first: they are scan-location and
+// cadence settings, not pricing, and hashing them in would mean editing an
+// extra_sources entry throws away the entire parse cache for no reason.
 func Fingerprint(appVersion string, cfg *pricing.Config) string {
-	b, _ := json.Marshal(cfg)
+	fpCfg := *cfg
+	fpCfg.WSLScan = ""
+	fpCfg.ExtraSources = nil
+	fpCfg.WSLIntervalHours = 0
+	b, _ := json.Marshal(&fpCfg)
 	sum := sha256.Sum256(b)
 	return appVersion + "|" + hex.EncodeToString(sum[:])
 }
@@ -333,30 +352,151 @@ func dedupSessions(sessions []*scan.Session) ([]*scan.Session, int) {
 	return kept, len(sessions) - len(kept)
 }
 
-// Collect resolves sources (the given list, else scan.DefaultSources()),
-// lists transcript files, parses any that are new or changed since the last
-// call on this Cache (reusing the cached session otherwise), aggregates the
-// result and returns the dashboard payload for seat and monthsN.
+// ---------------------------------------------------------------------------
+// Source resolution: auto-detect vs. explicit, WSL's slow tier kept separate
+// ---------------------------------------------------------------------------
+
+// CollectOpts groups Collect's per-call parameters. Sources and SlowSources
+// are what the caller already knows, not what Collect should go find:
+// resolving WSL sources can touch the filesystem over the 9P file server and
+// even cold-start a stopped distro, which must never happen off the
+// caller's own decided cadence (see RefreshSlow, and "Two refresh cadences"
+// in docs/2026-08-17_wsl-source-detection-design.md).
+type CollectOpts struct {
+	Seat    string
+	MonthsN int
+
+	// Sources is the full resolved source list. Empty means auto-detect:
+	// Collect calls scan.DefaultSourcesWithOptions itself, gated by
+	// RefreshSlow so a fast-tier pass never touches WSL.
+	Sources []string
+
+	// SlowSources is the subset of Sources that is slow to walk (WSL over
+	// the 9P file server). May be empty. Only consulted when Sources is
+	// non-empty; the auto-detect path (Sources empty) computes its own
+	// split instead.
+	SlowSources []string
+
+	// RefreshSlow requests a full pass: resolve (when auto-detecting) and
+	// walk the slow sources this time, rather than reusing the file list
+	// from the last pass that did.
+	RefreshSlow bool
+}
+
+// resolveSources implements the source-list half of "Two refresh cadences".
+// On a full pass it is free to auto-detect, including WSL. On a fast-tier
+// pass, an auto-detect must never call anything that can touch a WSL
+// distro, so it resolves native sources only and leaves the slow tier to
+// whatever Cache.SlowFiles already holds from the last full pass.
+// cfg.ExtraSources is appended to the fast tier in every case, then the
+// caller dedupes.
+func resolveSources(cfg *pricing.Config, opts CollectOpts) (fast, slow []string) {
+	switch {
+	case len(opts.Sources) > 0:
+		slow = opts.SlowSources
+		fast = subtractCaseInsensitive(opts.Sources, slow)
+	case opts.RefreshSlow:
+		native := scan.DefaultSourcesWithOptions(false)
+		full := scan.DefaultSourcesWithOptions(cfg.WSLScan != "off")
+		fast = native
+		slow = subtractCaseInsensitive(full, native)
+	default:
+		fast = scan.DefaultSourcesWithOptions(false)
+	}
+	fast = append(fast, cfg.ExtraSources...)
+	return fast, slow
+}
+
+// subtractCaseInsensitive returns the entries of all that are not present in
+// remove, comparing case-insensitively (Windows paths), preserving all's
+// order.
+func subtractCaseInsensitive(all, remove []string) []string {
+	if len(remove) == 0 {
+		return append([]string(nil), all...)
+	}
+	skip := make(map[string]bool, len(remove))
+	for _, r := range remove {
+		skip[strings.ToLower(r)] = true
+	}
+	var out []string
+	for _, a := range all {
+		if !skip[strings.ToLower(a)] {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// dedupeCaseInsensitive removes case-insensitive duplicate paths, keeping
+// the first occurrence and otherwise preserving order, so a source and an
+// extra_sources entry pointing at the same folder with different casing
+// (both valid on Windows) are not walked twice.
+func dedupeCaseInsensitive(in []string) []string {
+	seen := make(map[string]bool, len(in))
+	var out []string
+	for _, s := range in {
+		k := strings.ToLower(s)
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		out = append(out, s)
+	}
+	return out
+}
+
+// filesUnderAny reports which of files sit under one of the given source
+// roots, used to split the slow (WSL) tier's file list out of a full
+// FindJSONL pass so it can be reused, unwalked, on the next fast-tier pass.
+func filesUnderAny(files, roots []string) []string {
+	if len(roots) == 0 {
+		return nil
+	}
+	var out []string
+	for _, f := range files {
+		lf := strings.ToLower(f)
+		for _, r := range roots {
+			lr := strings.ToLower(r)
+			if lf == lr || strings.HasPrefix(lf, lr+string(os.PathSeparator)) || strings.HasPrefix(lf, lr+"/") {
+				out = append(out, f)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// Collect resolves sources (auto-detecting when opts.Sources is empty, else
+// using opts.Sources/opts.SlowSources as given), lists transcript files,
+// parses any that are new or changed since the last call on this Cache
+// (reusing the cached session otherwise), aggregates the result and returns
+// the dashboard payload for opts.Seat and opts.MonthsN.
 //
 // progress, if non-nil, is called once with (0, total) before parsing starts
 // and again after every file with (doneSoFar, total).
-func (c *Cache) Collect(cfg *pricing.Config, seat string, monthsN int, sources []string,
-	progress func(done, total int)) (Payload, error) {
-
-	if err := validateSeat(cfg, seat); err != nil {
+func (c *Cache) Collect(cfg *pricing.Config, opts CollectOpts, progress func(done, total int)) (Payload, error) {
+	if err := validateSeat(cfg, opts.Seat); err != nil {
 		return Payload{}, err
 	}
 
-	srcs := sources
-	if len(srcs) == 0 {
-		srcs = scan.DefaultSources()
-	}
-	c.Sources = srcs
-	if len(srcs) == 0 {
+	fast, slow := resolveSources(cfg, opts)
+	fast = dedupeCaseInsensitive(fast)
+	slow = dedupeCaseInsensitive(slow)
+	all := dedupeCaseInsensitive(append(append([]string{}, fast...), slow...))
+	c.Sources = all
+	if len(all) == 0 {
 		return Payload{}, ErrNoSources
 	}
 
-	files := scan.FindJSONL(srcs)
+	var files []string
+	if opts.RefreshSlow {
+		files = scan.FindJSONL(all)
+		c.SlowFiles = filesUnderAny(files, slow)
+		c.SlowScannedAt = time.Now()
+	} else {
+		files = scan.FindJSONL(fast)
+		files = append(files, c.SlowFiles...)
+	}
 	c.Files = files
 	total := len(files)
 	if progress != nil {
@@ -368,6 +508,21 @@ func (c *Cache) Collect(cfg *pricing.Config, seat string, monthsN int, sources [
 
 	if c.entries == nil {
 		c.entries = map[string]cacheEntry{}
+	}
+
+	// When this pass is not walking the slow tier, a slow file already in
+	// the cache is trusted outright rather than stat'ed: an os.Stat over the
+	// WSL 9P file server is exactly the round trip the slow cadence exists
+	// to avoid. A slow file with no cache entry yet (first time it was ever
+	// seen, or the cache was reset) falls through to the normal stat-and-
+	// parse path below, so a first pass with RefreshSlow false still
+	// produces correct numbers rather than a hole.
+	var trustSlow map[string]bool
+	if !opts.RefreshSlow && len(c.SlowFiles) > 0 {
+		trustSlow = make(map[string]bool, len(c.SlowFiles))
+		for _, f := range c.SlowFiles {
+			trustSlow[f] = true
+		}
 	}
 
 	// Sequential pass: stat every file and split into cache hits (reuse the
@@ -385,6 +540,13 @@ func (c *Cache) Collect(cfg *pricing.Config, seat string, monthsN int, sources [
 	var misses []miss
 	hits := 0
 	for i, f := range files {
+		if trustSlow[f] {
+			if e, ok := c.entries[f]; ok {
+				results[i] = e.session
+				hits++
+				continue
+			}
+		}
 		fi, statErr := os.Stat(f)
 		if statErr == nil {
 			if e, ok := c.entries[f]; ok && e.mtime.Equal(fi.ModTime()) && e.size == fi.Size() {
@@ -473,11 +635,11 @@ func (c *Cache) Collect(cfg *pricing.Config, seat string, monthsN int, sources [
 	log.Printf("dropped %d duplicate session(s)", c.DroppedDuplicates)
 
 	today := time.Now()
-	cutoff := monthStart(today, max(0, monthsN-1))
+	cutoff := monthStart(today, max(0, opts.MonthsN-1))
 	months, weeks, days, kept := agg.Build(sessions, cutoff)
 	if len(kept) == 0 {
 		return Payload{}, ErrNoSessions
 	}
 
-	return BuildPayload(cfg, seat, cutoff, today, months, weeks, days, kept), nil
+	return BuildPayload(cfg, opts.Seat, cutoff, today, months, weeks, days, kept), nil
 }

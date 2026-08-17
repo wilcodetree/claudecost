@@ -11,9 +11,30 @@ import (
 	"time"
 )
 
+// wslDeadline bounds how long DefaultSourcesWithOptions will wait on WSL
+// distro detection and per-distro probing before giving up on whatever has
+// not finished yet. Probing a WSL 2 distro crosses the 9P file server and,
+// for a stopped distro, can cold-start a Linux VM; 5 seconds is enough for a
+// warm distro and short enough that a cold-start stall does not hold up the
+// window's first paint.
+const wslDeadline = 5 * time.Second
+
 // DefaultSources lists every place Cowork or Claude Code is known to write
-// JSONL transcripts, keeping only those that exist on this machine.
+// JSONL transcripts, keeping only those that exist on this machine,
+// including any WSL distribution on Windows. Equivalent to
+// DefaultSourcesWithOptions(true).
 func DefaultSources() []string {
+	return DefaultSourcesWithOptions(true)
+}
+
+// DefaultSourcesWithOptions is DefaultSources with WSL distro detection
+// optional. A caller that already knows WSL scanning is disabled by config
+// (wsl_scan: off), or that only wants the fast native sources for a
+// cadence-limited pass, passes scanWSL false and skips the registry read and
+// any UNC probing entirely. The option is threaded through as a plain bool
+// rather than read from config here, so this package never needs to import
+// the pricing config types.
+func DefaultSourcesWithOptions(scanWSL bool) []string {
 	var out []string
 	add := func(p string) {
 		if fi, err := os.Stat(p); err == nil && fi.IsDir() {
@@ -25,6 +46,13 @@ func DefaultSources() []string {
 	// Claude Code CLI
 	if home != "" {
 		add(filepath.Join(home, ".claude", "projects"))
+	}
+	// A moved CLAUDE_CONFIG_DIR relocates the whole .claude tree, transcripts
+	// included. Honouring it here is a native-side bug fix independent of
+	// WSL: a user who moved it currently sees the same empty report a WSL
+	// tester with a moved config dir sees. Costs one env lookup when unset.
+	if ccd := os.Getenv("CLAUDE_CONFIG_DIR"); ccd != "" {
+		add(filepath.Join(ccd, "projects"))
 	}
 
 	// The two session folder names Claude Desktop has used. Cowork and Chat
@@ -60,6 +88,10 @@ func DefaultSources() []string {
 			// Linux
 			add(filepath.Join(home, ".config", "Claude", name))
 		}
+	}
+
+	if scanWSL {
+		out = append(out, wslSources(wslDeadline)...)
 	}
 	return out
 }

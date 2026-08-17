@@ -17,5 +17,9 @@
     "output_cost_factor": 1.8085,
     "calibrated_on": "example",
     "window": "example"
-  }
+  },
+  "_comment_wsl": "wsl_scan, extra_sources and wsl_interval_hours are new in v0.7.0. The three values below are shown at their defaults (auto-scan, nothing extra, 4-hour WSL cadence), so leaving this block out entirely is equivalent. Set wsl_scan to \"off\" if you do not want the app touching a WSL distro at all.",
+  "wsl_scan": "auto",
+  "extra_sources": [],
+  "wsl_interval_hours": 4
 }
