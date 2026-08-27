@@ -632,10 +632,10 @@ func (a *app) stampAreaHTML() string {
 			a.cache.SlowScannedAt.Format("15:04") + `</span>`
 	}
 	return `<div style="display:flex;align-items:center;gap:12px">
- <span style="color:var(--pine-40);font-size:11px;opacity:.75;white-space:nowrap">v` + version + `</span>` + wslStamp + `
+ <span style="color:var(--sun);font-size:11px;white-space:nowrap">v` + version + `</span>` + wslStamp + `
  <span id="cc_progress" style="display:none;color:var(--pine-40);font-size:12px;white-space:nowrap"></span>
- <button id="cc_settings_btn" title="Subscription settings" style="padding:6px 10px;border:1px solid var(--pine-40);border-radius:6px;background:transparent;color:#fff;font:14px 'Inter','Segoe UI',sans-serif;cursor:pointer;white-space:nowrap">&#9881;</button>
- <button id="cc_btn" style="padding:6px 12px;border:1px solid var(--pine-40);border-radius:6px;background:transparent;color:#fff;font:13px 'Inter','Segoe UI',sans-serif;cursor:pointer;white-space:nowrap">Refresh now</button>
+ <button id="cc_settings_btn" class="act ghost" type="button" title="Subscription settings" style="padding:6px 10px;white-space:nowrap">&#9881;</button>
+ <button id="cc_btn" class="act" type="button" style="padding:6px 12px;white-space:nowrap">Refresh now</button>
  ` + stampAnchor + `
 </div>`
 }
@@ -692,14 +692,14 @@ const appChromeScript = `
   window.ccRefreshFailed = function(){
     btn.disabled = false;
     btn.textContent = 'Refresh failed – try again';
-    btn.style.borderColor = '#ff8a65';
-    btn.style.color = '#ff8a65';
+    btn.style.borderColor = 'var(--warn)';
+    btn.style.color = 'var(--warn)';
   };
 
   btn.onclick = function(){
     btn.disabled = true;
-    btn.style.borderColor = 'var(--pine-40)';
-    btn.style.color = '#fff';
+    btn.style.borderColor = '';
+    btn.style.color = '';
     btn.textContent = 'Rebuilding…';
     window.ccRefresh();
   };
