@@ -26,71 +26,84 @@
 </script>
 <style>
 :root{
+  color-scheme: dark;
+  --bg:#0A1422;
+  --pine:#0E1B2E; --pine-l:#3EDCB0; --pine-10:#0E1B2E; --pine-40:#1C2E4A;
+  --sun:#3EDCB0; --sun-l:#2FB894; --sun-20:#0F2620;
+  --lav:#5E7088; --lav-l:#2A3E5C; --lav-15:#152238;
+  --merc:#1C2E4A; --merc-l:#112038;
+  --ink:#EAF1F8; --muted:#8A9CB5; --warn:#E8A16B;
+  --accent-ink:#0A1422;
+}
+:root[data-theme="light"]{
   color-scheme: light;
-  --pine:#003238; --pine-l:#007885; --pine-10:#E5F1F3; --pine-40:#99C9CE;
-  --sun:#FFDD32; --sun-l:#FFF799; --sun-20:#FFFDEB;
-  --lav:#C08FFF; --lav-l:#E0C7FF; --lav-15:#FAF7FF;
-  --merc:#E3E0DE; --merc-l:#F4F3F2;
-  --ink:#003238; --muted:#5b6b6e; --warn:#B4531A;
+  --bg:#F6F8FA;
+  --pine:#E9EEF4; --pine-l:#0B6B5B; --pine-10:#E9EEF4; --pine-40:#D6DEE7;
+  --sun:#0E5C4E; --sun-l:#0B6B5B; --sun-20:#E6F2EF;
+  --lav:#5E7088; --lav-l:#4A5A70; --lav-15:#EDF1F5;
+  --merc:#D6DEE7; --merc-l:#FFFFFF;
+  --ink:#0A1422; --muted:#4A5A70; --warn:#B5651D;
+  --accent-ink:#FFFFFF;
 }
 *{box-sizing:border-box}
-body{margin:0;background:#fff;color:var(--ink);font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.5}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.5}
 .wrap{max-width:1180px;margin:0 auto;padding:0 20px 56px}
-header{background:var(--pine);color:#fff;padding:24px 20px 20px}
-header .inner{max-width:1180px;margin:0 auto;display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
-header h1{margin:0 0 4px;font-size:23px;font-weight:650;letter-spacing:-.2px}
-header p{margin:0;color:var(--pine-40);font-size:13px}
-.stamp{font-size:12px;color:var(--pine-40);text-align:right}
+header{background:var(--pine);color:var(--ink);padding:24px 20px 20px}
+header .inner{max-width:1180px;margin:0 auto;display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}
+.topright{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+header h1{margin:0 0 4px;font-size:23px;font-weight:600;font-family:"Space Grotesk",Inter,"Segoe UI",system-ui,sans-serif;letter-spacing:-.2px}
+header p{margin:0;color:var(--muted);font-size:13px}
+.stamp{font-size:12px;color:var(--muted);font-family:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;text-align:right}
 .stamp b{color:var(--sun)}
-#topbar{position:sticky;top:0;z-index:20;background:#fff;box-shadow:0 1px 0 var(--merc)}
-.tabsbar{background:#fff;border-bottom:2px solid var(--merc)}
+#topbar{position:sticky;top:0;z-index:20;background:var(--bg);box-shadow:0 1px 0 var(--merc)}
+.tabsbar{background:var(--bg);border-bottom:2px solid var(--merc)}
 .tabs{display:flex;gap:4px;flex-wrap:wrap;max-width:1180px;margin:0 auto;padding:12px 20px 0}
 .wrap>section{padding-top:22px}
 .tab{padding:9px 16px;border:none;background:none;font:inherit;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px}
-.tab.on{color:var(--pine);border-bottom-color:var(--sun)}
-.tab-back{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;margin:4px 8px 4px 0;flex-shrink:0;border:1px solid var(--merc);border-radius:8px;background:#fff;color:var(--pine);font-size:17px;font-weight:bold;cursor:pointer}
+.tab.on{color:var(--ink);border-bottom-color:var(--sun)}
+.tab-back{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;margin:4px 8px 4px 0;flex-shrink:0;border:1px solid var(--merc);border-radius:8px;background:var(--merc-l);color:var(--ink);font-size:17px;font-weight:bold;cursor:pointer}
 .tab-back:disabled{cursor:default}
-h2{font-size:17px;margin:28px 0 12px;font-weight:650}
+h2{font-size:17px;margin:28px 0 12px;font-weight:600;font-family:"Space Grotesk",Inter,"Segoe UI",system-ui,sans-serif}
 h2:first-child{margin-top:4px}
-h3{font-size:12.5px;margin:0 0 10px;text-transform:uppercase;letter-spacing:.06em;color:var(--pine-l);font-weight:700}
+h3{font-size:12.5px;margin:0 0 10px;text-transform:uppercase;letter-spacing:.06em;color:var(--pine-l);font-weight:700;font-family:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace}
 p.lede{color:var(--muted);margin:-4px 0 16px;max-width:840px}
 .grid{display:grid;gap:16px}
 .g4{grid-template-columns:repeat(4,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g2{grid-template-columns:repeat(2,1fr)}
 @media(max-width:900px){.g4,.g3{grid-template-columns:1fr 1fr}}
 @media(max-width:600px){.g4,.g3,.g2{grid-template-columns:1fr}}
 .card{background:var(--merc-l);border:1px solid var(--merc);border-radius:10px;padding:15px 17px}
-.card.pine{background:var(--pine);color:#fff;border-color:var(--pine)}
-.card.pine .k,.card.pine .sub{color:var(--pine-40)}
+.card.pine{background:var(--pine);color:var(--ink);border-color:var(--sun)}
+.card.pine .k,.card.pine .sub{color:var(--muted)}
 .card.sun{background:var(--sun-20);border-color:var(--sun)}
 .card.lav{background:var(--lav-15);border-color:var(--lav-l)}
-.card.plain{background:#fff}
-.k{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;margin-bottom:5px}
-.v{font-size:25px;font-weight:680;letter-spacing:-.5px;line-height:1.1}
+.card.plain{background:var(--pine)}
+.k{font-family:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;margin-bottom:5px}
+.v{font-family:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;font-size:25px;font-weight:600;letter-spacing:-.5px;line-height:1.1}
 .v.sm{font-size:19px}
 .sub{font-size:12px;color:var(--muted);margin-top:4px}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{text-align:right;padding:7px 9px;border-bottom:1px solid var(--merc)}
 th:first-child,td:first-child{text-align:left}
-thead th{background:var(--pine-10);font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--pine);border-bottom:1px solid var(--pine-40);cursor:pointer;white-space:nowrap}
+thead th{background:var(--pine-10);font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:1px solid var(--pine-40);cursor:pointer;white-space:nowrap}
 .scroll thead th{position:sticky;top:0;z-index:2}
 thead th.nosort{cursor:default}
 tbody tr:hover{background:var(--merc-l)}
 tfoot td{font-weight:700;background:var(--merc-l);border-top:2px solid var(--pine-40)}
 tr.flag td:first-child{border-left:3px solid var(--sun)}
-.chartbox{position:relative;height:280px;background:#fff;border:1px solid var(--merc);border-radius:10px;padding:12px}
+.chartbox{position:relative;height:280px;background:var(--merc-l);border:1px solid var(--merc);border-radius:10px;padding:12px}
 .note{font-size:12.5px;color:var(--muted);background:var(--merc-l);border-left:3px solid var(--pine-40);padding:11px 14px;border-radius:0 6px 6px 0;margin:14px 0}
 .note.warn{border-left-color:var(--sun);background:var(--sun-20);color:var(--ink)}
-.note b{color:var(--pine)}
-.pill{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--merc);color:var(--muted);white-space:nowrap}
-.pill.sun{background:var(--sun);color:var(--pine)}
-.pill.lav{background:var(--lav-l);color:var(--pine)}
-.pill.pine{background:var(--pine-10);color:var(--pine)}
+.note b{color:var(--ink)}
+.pill{display:inline-block;font-family:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--merc);color:var(--muted);white-space:nowrap}
+.pill.sun{background:var(--sun);color:var(--accent-ink)}
+.pill.lav{background:var(--lav-l);color:var(--ink)}
+.pill.pine{background:var(--pine-10);color:var(--pine-l)}
 .hidden{display:none}
-label{display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--pine)}
-select,input[type=number],input[type=text]{padding:6px 9px;border:1px solid var(--merc);border-radius:6px;font:inherit;background:#fff;color:var(--ink)}
+label{display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--ink)}
+select,input[type=number],input[type=text]{padding:6px 9px;border:1px solid var(--merc);border-radius:6px;font:inherit;background:var(--pine);color:var(--ink)}
 .controls{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:14px}
-button.act{background:var(--pine);color:#fff;border:none;padding:8px 14px;border-radius:6px;font:inherit;font-weight:600;cursor:pointer}
-button.act.ghost{background:#fff;color:var(--pine);border:1px solid var(--pine-40)}
+button.act{background:var(--sun);color:var(--accent-ink);border:none;padding:8px 14px;border-radius:6px;font:inherit;font-weight:600;cursor:pointer}
+button.act.ghost{background:var(--merc-l);color:var(--pine-l);border:1px solid var(--pine-40)}
 .scroll{overflow-x:auto;max-height:640px;overflow-y:auto}
 .scroll.tall{max-height:calc(100vh - 340px);min-height:280px}
 .scroll.tall.with-filters{max-height:calc(100vh - 420px)}
@@ -100,9 +113,9 @@ code{background:var(--merc-l);padding:1px 5px;border-radius:4px;font-size:12.5px
 .bar{height:6px;background:var(--merc);border-radius:3px;overflow:hidden;margin-top:5px}
 .bar i{display:block;height:100%;background:var(--pine-l)}
 .tipped{cursor:help}
-.tip{position:fixed;z-index:100;max-width:460px;background:var(--pine);color:#fff;
+.tip{position:fixed;z-index:100;max-width:460px;background:var(--pine-40);color:var(--ink);
   padding:9px 12px;border-radius:8px;font-size:12.5px;line-height:1.45;
-  white-space:normal;overflow-wrap:anywhere;box-shadow:0 4px 14px rgba(0,50,56,.28);
+  white-space:normal;overflow-wrap:anywhere;box-shadow:0 4px 14px rgba(0,0,0,.55);
   pointer-events:none}
 /* Sessions table: one row per line. Only the title truncates; hover shows it all. */
 #t_sessions{table-layout:fixed;min-width:1000px}
@@ -122,6 +135,15 @@ code{background:var(--merc-l);padding:1px 5px;border-radius:4px;font-size:12.5px
 /* Limits table on How it works: everything right-aligned to match the headers */
 #t_limits td,#t_limits th{text-align:right;vertical-align:top}
 #t_limits td:first-child{white-space:nowrap}
+/* ZeroNonsense.dev brand mast */
+.mast{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.masttile{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:#112038;border:1px solid #1C2E4A;font-family:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;font-size:12px;font-weight:700;color:#EAF1F8}
+.masttile .mz{color:#3EDCB0}
+.topctrls{display:flex;align-items:center;gap:6px;margin-left:6px}
+.tglbtn{background:var(--merc-l);color:var(--ink);border:1px solid var(--merc);border-radius:6px;padding:5px 10px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.tglbtn:hover{border-color:var(--pine-l)}
+.mastword{font-family:"Space Grotesk",Inter,"Segoe UI",system-ui,sans-serif;font-weight:600;font-size:14px;color:var(--ink);letter-spacing:-.2px}
+.mastword .mastdev{color:#5E7088}
 </style>
 </head>
 <body>
@@ -129,10 +151,17 @@ code{background:var(--merc-l);padding:1px 5px;border-radius:4px;font-size:12.5px
 <div id="topbar">
 <header><div class="inner">
   <div>
+    <div class="mast"><span class="masttile"><span class="mz">0</span>N</span><span class="mastword">ZeroNonsense<span class="mastdev">.dev</span></span></div>
     <h1>Claude Cost (User)</h1>
     <p id="subtitle">Your own usage and what it costs</p>
   </div>
-  <div class="stamp" id="stamp"></div>
+  <div class="topright">
+    <div class="topctrls">
+      <button id="btn_lang" class="tglbtn" type="button" title="Language / Taal">EN</button>
+      <button id="btn_theme" class="tglbtn" type="button" title="Theme">Dark</button>
+    </div>
+    <div class="stamp" id="stamp"></div>
+  </div>
 </div></header>
 <div class="tabsbar"><div class="tabs">
   <button id="tab_back" class="tab-back" title="Back to previous tab" aria-label="Back to previous tab">&lsaquo;</button>
@@ -412,14 +441,230 @@ catch(e){ document.querySelector('.wrap').innerHTML =
   '<div class="note warn" style="margin-top:20px"><b>No usage data embedded.</b> Run the extract script and republish.</div>'; return; }
 
 var LS = 'claude-cost-user-v1';
-var UI = {cur:'eur', fx:0.92, basis:'sub', sort:'start', dir:-1, f:{surface:'',month:'',q:'',long:''}};
+var UI = {cur:'eur', fx:0.92, basis:'sub', sort:'start', dir:-1, lang:'en', theme:'dark', f:{surface:'',month:'',q:'',long:''}};
 try { var st = JSON.parse(localStorage.getItem(LS)||'null');
-  if(st){ UI.cur = st.cur||UI.cur; UI.fx = st.fx>0?st.fx:UI.fx; UI.basis = st.basis||UI.basis; } } catch(e){}
-function persist(){ try{ localStorage.setItem(LS, JSON.stringify({cur:UI.cur, fx:UI.fx, basis:UI.basis})); }catch(e){} }
+  if(st){ UI.cur = st.cur||UI.cur; UI.fx = st.fx>0?st.fx:UI.fx; UI.basis = st.basis||UI.basis;
+    UI.lang = st.lang||UI.lang; UI.theme = st.theme||UI.theme; } } catch(e){}
+function persist(){ try{ localStorage.setItem(LS, JSON.stringify(
+  {cur:UI.cur, fx:UI.fx, basis:UI.basis, lang:UI.lang, theme:UI.theme})); }catch(e){} }
 var SUB = D.subscription || {};
 
 var SL = D.surface_labels || {};
 var charts = {};
+
+// ---------- theme ----------
+function chartPalette(){
+  return UI.theme === 'light'
+    ? {accent:'#0B6B5B', muted:'#4A5A70', blue2:'#5E7088', blue3:'#8A9CB5', grid:'#D6DEE7', text:'#0A1422', card:'#FFFFFF'}
+    : {accent:'#3EDCB0', muted:'#8A9CB5', blue2:'#5E7088', blue3:'#4A5A70', grid:'#1C2E4A', text:'#EAF1F8', card:'#112038'};
+}
+function applyChartDefaults(){
+  var P = chartPalette();
+  if (typeof Chart !== 'undefined') { Chart.defaults.color = P.muted; Chart.defaults.borderColor = P.grid; }
+}
+function applyTopbarLabels(){
+  document.getElementById('btn_lang').textContent = UI.lang.toUpperCase();
+  document.getElementById('btn_theme').textContent = UI.theme === 'light' ? t('theme_light') : t('theme_dark');
+}
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme', UI.theme);
+  applyTopbarLabels();
+  applyChartDefaults();
+}
+
+// ---------- i18n ----------
+var MONTH_NAMES = {
+  en:['January','February','March','April','May','June','July','August','September','October','November','December'],
+  nl:['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december']
+};
+var DOW_SHORT = {en:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], nl:['zo','ma','di','wo','do','vr','za']};
+var DOW_FULL = {en:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
+  nl:['zondag','maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag']};
+
+var I18N = {
+en:{
+  theme_dark:'Dark', theme_light:'Light',
+  snapshot_taken:'Snapshot taken', unknown:'unknown',
+  sessions_word:'sessions', calls_word:'calls', tokens_word:'tokens',
+  no_prev_month:'nothing in the previous month', no_data:'no data',
+  busiest_in:function(v){ return 'Busiest session in '+v.month; },
+  busiest_generic:'Busiest session this month',
+  no_sessions_yet:'no sessions yet this month',
+  vs_licence:function(v){ return v.month+' vs your licence'; },
+  vs_licence_generic:'This month vs your licence',
+  not_enough_data:'not enough data yet',
+  seat_not_configured:'seat price not configured',
+  seat_sub:function(v){
+    return v.cost + (v.sub ? ' of subscription' : ' of API list value')
+      + ' against a ' + v.seatPrice + '/month ' + v.seatName + ' seat, '
+      + v.dayNow + ' day' + (v.dayNow===1?'':'s') + ' into the month'
+      + (v.prevX!=null ? '. Last month finished at ' + v.prevX + 'x.' : '');
+  },
+  card_note_sub:'This is your personal cut of the one Claude bill the company already pays, worked out '
+    + 'from how much you used compared with everyone else. It is not an extra charge, and it '
+    + 'is not your seat price. See the How it works tab.',
+  card_note_list:'What your tokens would cost at Anthropic\'s published API prices, if the company paid per '
+    + 'token instead of per seat. Useful for quoting client work. Not what we pay.',
+  basis_note_sub_html:'<b>This is not an extra charge, and not your seat price.</b> '
+    + 'It is your slice of the one invoice the organisation already pays, divided up by how much '
+    + 'each person actually used. Most seats go almost unused, so their share lands on the people '
+    + 'who do use Claude. That is why a heavy user can show several times their own seat price '
+    + 'while the company pays exactly the same either way. Nothing here is billed to you. '
+    + 'Full working on the About tab.',
+  basis_note_list_html:'<b>Showing API list price, not money we pay.</b> Every token at Anthropic\'s '
+    + 'published rates, cache traffic included. Runs several times the subscription figure. '
+    + 'Useful for pricing client work or sizing an API build, misleading as a cost report.',
+  verdict_none_html:'<b>Nothing yet this month.</b> No local Cowork or Claude Code activity since the month began. Cowork sessions that run in Anthropic\'s cloud, and claude.ai browser chats, leave no local transcript and cannot show up here. Check the Real spend tab instead.',
+  verdict_high:function(v){ return '<b>Session length is your main cost driver.</b> '+v.pct+'% of your '+v.basisWord+' sits in the '+v.ln+' session'+(v.ln===1?'':'s')+' that ran past '+v.longCalls+' calls. Splitting those into shorter, single-topic sessions is the one change that would move this number the most.'; },
+  verdict_mid:function(v){ return '<b>A handful of long sessions carry a noticeable share.</b> '+v.pct+'% of your '+v.basisWord+' is in '+v.ln+' marathon session'+(v.ln===1?'':'s')+' this month. Worth watching, not yet worth restructuring how you work.'; },
+  verdict_low:function(v){ return '<b>Your sessions are staying lean.</b> Only '+v.pct+'% of your '+v.basisWord+' comes from sessions past '+v.longCalls+' calls, and the average session costs '+v.avg+'. This is the cheap end of the distribution.'; },
+  basis_word_sub:'subscription cost', basis_word_list:'token value',
+  th_share:'Share', th_total:'Total',
+  th_sessions:'Sessions', th_calls:'Calls', th_tokens:'Tokens', th_cost:'Cost', th_surface:'Surface', th_model:'Model',
+  split_text_html:function(v){ return '<h3>Read this once</h3><p style="margin-top:0">Of every token you spent, '
+    + v.cacheR + '% was Claude re-reading context it had already been sent, and only '
+    + v.out + '% was the answer it wrote back. '
+    + v.fresh + '% was genuinely new text you typed.</p>'
+    + '<p style="margin-bottom:0">That is normal and not waste in itself. It does mean the way to spend less is to '
+    + 'carry less context: shorter sessions, fewer loaded plugins and skills, leaner instruction files. '
+    + 'Switching to a cheaper model changes the multiplier; carrying less context changes the volume.</p>'; },
+  chart_could_not_load:function(v){ return v.label+' could not load (the chart library did not load from its CDN). The numbers above and the tables below are unaffected.'; },
+  chart_cost_per_day:function(v){ return 'Cost per day ('+v.sym+')'; },
+  chart_cost_per_day_label:'Cost per day',
+  doughnut_labels:['Cache read, re-sent context','Cache write, storing context','Output, the answer','Fresh input, what you typed'],
+  chart_share_title:'Share of your token volume',
+  tooltip_calls_tokens:function(v){ return v.calls+' calls · '+v.tokens+' tokens'; },
+  nothing_in_period:'Nothing in this period.',
+  week_label:function(v){ return 'Week '+v.n+', '+v.y; },
+  chart_cost_per_week:function(v){ return 'Cost per week ('+v.sym+')'; },
+  chart_cost_label:'Cost',
+  tools_no_data_html:'No tool data yet. Tool counting starts with v0.5.0, so sessions parsed by an earlier version show nothing until the cache is rebuilt.',
+  chart_tools_title:'Top connectors, plugins and skills by call count',
+  chart_calls_label:'Calls',
+  no_sessions_match:'No sessions match these filters.',
+  long_pill:'long',
+  sessions_shown:function(v){ return v.shown+' of '+v.total+' sessions shown'; },
+  sessions_count:function(v){ return v.n+' sessions'; },
+  basis_detail_none_html:'<i>No subscription figures configured, so only API list price is available.</i>',
+  basis_detail_html:function(v){
+    return '<b>How it is set up.</b> The organisation pays one monthly invoice for everyone\'s '
+    + 'seats. Anthropic separately meters how much each person consumed, and across the whole '
+    + 'organisation that metered consumption comes to roughly <b>' + v.used + '%</b> of the '
+    + 'invoice, so there is real headroom. Your figures are your share of that consumption applied to '
+    + 'the invoice, which means the numbers here for everyone in the organisation add up to exactly '
+    + 'what is paid, no more. Your seat tier is <b>' + v.seat + '</b>. '
+    + 'Calibrated ' + v.calibrated + '.'
+    + (v.credits
+        ? ' One thing the allocation leaves out: the organisation also keeps a prepaid balance of '
+          + 'usage credits so people can carry on working past a plan limit. That is real money spent '
+          + 'outside the invoice, so heavy usage costs a little more than shown here.'
+        : '');
+  },
+  subtitle_sub:'Your share of what we actually pay for Claude',
+  subtitle_list:'Your usage at Anthropic\'s published API list prices',
+  th_price_model:'Model', th_price_input:'Input', th_price_output:'Output', th_price_cw:'Cache write', th_price_cr:'Cache read',
+  btn_refreshing:'Refreshing…',
+  refresh_started_msg_html:'Started your refresh job. It re-reads your sessions and republishes this page. Give it a minute, then reload.',
+  btn_refresh_started:'Refresh started',
+  btn_refresh_now:'Refresh now',
+  refresh_error:function(v){ return 'Could not start the refresh job: ' + v.err + '. Run claudecost.exe again instead.'; },
+  render_error:function(v){ return 'Something went wrong rendering: '+v.msg; }
+},
+nl:{
+  theme_dark:'Donker', theme_light:'Licht',
+  snapshot_taken:'Momentopname genomen', unknown:'onbekend',
+  sessions_word:'sessies', calls_word:'aanroepen', tokens_word:'tokens',
+  no_prev_month:'niets in de vorige maand', no_data:'geen data',
+  busiest_in:function(v){ return 'Drukste sessie in '+v.month; },
+  busiest_generic:'Drukste sessie deze maand',
+  no_sessions_yet:'nog geen sessies deze maand',
+  vs_licence:function(v){ return v.month+' vs. je licentie'; },
+  vs_licence_generic:'Deze maand vs. je licentie',
+  not_enough_data:'nog niet genoeg data',
+  seat_not_configured:'zetelprijs niet ingesteld',
+  seat_sub:function(v){
+    return v.cost + (v.sub ? ' van het abonnement' : ' van de API-listwaarde')
+      + ' tegenover een ' + v.seatPrice + '/maand ' + v.seatName + '-zetel, '
+      + v.dayNow + ' dag' + (v.dayNow===1?'':'en') + ' in de maand'
+      + (v.prevX!=null ? '. Vorige maand eindigde op ' + v.prevX + 'x.' : '');
+  },
+  card_note_sub:'Dit is jouw persoonlijke aandeel in de ene Claude-rekening die het bedrijf al betaalt, '
+    + 'berekend op basis van hoeveel je gebruikte in verhouding tot iedereen anders. Het is geen extra '
+    + 'kosten en ook niet je zetelprijs. Zie het tabblad Hoe het werkt.',
+  card_note_list:'Wat je tokens zouden kosten tegen Anthropic\'s gepubliceerde API-prijzen, als het bedrijf '
+    + 'per token betaalde in plaats van per zetel. Handig voor het offreren van klantwerk. Niet wat wij betalen.',
+  basis_note_sub_html:'<b>Dit zijn geen extra kosten en ook niet je zetelprijs.</b> '
+    + 'Het is jouw deel van de ene factuur die de organisatie al betaalt, verdeeld naar hoeveel '
+    + 'iedereen daadwerkelijk gebruikte. De meeste zetels worden nauwelijks gebruikt, dus hun deel '
+    + 'komt terecht bij de mensen die Claude wel gebruiken. Daarom kan een zware gebruiker een veelvoud '
+    + 'van de eigen zetelprijs laten zien, terwijl het bedrijf hoe dan ook precies hetzelfde betaalt. '
+    + 'Hier wordt niets bij jou in rekening gebracht. Volledige uitleg op het tabblad Over.',
+  basis_note_list_html:'<b>Dit toont de API-listprijs, niet het geld dat we betalen.</b> Elke token tegen '
+    + 'Anthropic\'s gepubliceerde tarieven, inclusief cacheverkeer. Ligt een veelvoud hoger dan het '
+    + 'abonnementscijfer. Handig om klantwerk te prijzen of een API-build te dimensioneren, misleidend als kostenrapport.',
+  verdict_none_html:'<b>Nog niets deze maand.</b> Geen lokale Cowork- of Claude Code-activiteit sinds het begin van de maand. Cowork-sessies die in Anthropic\'s cloud draaien, en claude.ai-gesprekken in de browser, laten geen lokaal transcript achter en kunnen hier niet verschijnen. Kijk in plaats daarvan op het tabblad Werkelijke uitgaven.',
+  verdict_high:function(v){ return '<b>Sessieduur is je belangrijkste kostenfactor.</b> '+v.pct+'% van je '+v.basisWord+' zit in de '+v.ln+' sessie'+(v.ln===1?'':'s')+' die langer duurde dan '+v.longCalls+' aanroepen. Die opsplitsen in kortere, eenderwerp-sessies is de ene verandering die dit cijfer het meest zou beïnvloeden.'; },
+  verdict_mid:function(v){ return '<b>Een handvol lange sessies neemt een merkbaar aandeel voor zijn rekening.</b> '+v.pct+'% van je '+v.basisWord+' zit in '+v.ln+' marathonsessie'+(v.ln===1?'':'s')+' deze maand. Het is de moeite waard om in de gaten te houden, nog niet om je werkwijze om te gooien.'; },
+  verdict_low:function(v){ return '<b>Je sessies blijven compact.</b> Slechts '+v.pct+'% van je '+v.basisWord+' komt uit sessies langer dan '+v.longCalls+' aanroepen, en de gemiddelde sessie kost '+v.avg+'. Dat is de goedkope kant van de verdeling.'; },
+  basis_word_sub:'abonnementskosten', basis_word_list:'tokenwaarde',
+  th_share:'Aandeel', th_total:'Totaal',
+  th_sessions:'Sessies', th_calls:'Aanroepen', th_tokens:'Tokens', th_cost:'Kosten', th_surface:'Oppervlak', th_model:'Model',
+  split_text_html:function(v){ return '<h3>Dit eenmaal lezen</h3><p style="margin-top:0">Van elke token die je verbruikte, '
+    + 'was ' + v.cacheR + '% Claude die al eerder verzonden context opnieuw las, en slechts '
+    + v.out + '% was het antwoord dat het terugschreef. '
+    + v.fresh + '% was echt nieuwe tekst die jij typte.</p>'
+    + '<p style="margin-bottom:0">Dat is normaal en op zich geen verspilling. Het betekent wel dat de manier om minder '
+    + 'uit te geven is om minder context mee te dragen: kortere sessies, minder geladen plugins en skills, '
+    + 'kortere instructiebestanden. Overstappen naar een goedkoper model verandert de vermenigvuldiger; '
+    + 'minder context meedragen verandert het volume.</p>'; },
+  chart_could_not_load:function(v){ return v.label+' kon niet laden (de grafiekbibliotheek is niet geladen vanaf de CDN). De cijfers hierboven en de tabellen hieronder blijven onaangetast.'; },
+  chart_cost_per_day:function(v){ return 'Kosten per dag ('+v.sym+')'; },
+  chart_cost_per_day_label:'Kosten per dag',
+  doughnut_labels:['Cache-lezen, opnieuw verzonden context','Cache-schrijven, context opslaan','Output, het antwoord','Verse input, wat jij typte'],
+  chart_share_title:'Aandeel in je tokenvolume',
+  tooltip_calls_tokens:function(v){ return v.calls+' aanroepen · '+v.tokens+' tokens'; },
+  nothing_in_period:'Niets in deze periode.',
+  week_label:function(v){ return 'Week '+v.n+', '+v.y; },
+  chart_cost_per_week:function(v){ return 'Kosten per week ('+v.sym+')'; },
+  chart_cost_label:'Kosten',
+  tools_no_data_html:'Nog geen tooldata. Het tellen van tools begint bij v0.5.0, dus sessies die door een eerdere versie zijn verwerkt tonen niets totdat de cache opnieuw is opgebouwd.',
+  chart_tools_title:'Meest gebruikte connectors, plugins en skills op aantal aanroepen',
+  chart_calls_label:'Aanroepen',
+  no_sessions_match:'Geen sessies voldoen aan deze filters.',
+  long_pill:'lang',
+  sessions_shown:function(v){ return v.shown+' van de '+v.total+' sessies getoond'; },
+  sessions_count:function(v){ return v.n+' sessies'; },
+  basis_detail_none_html:'<i>Geen abonnementscijfers ingesteld, dus alleen de API-listprijs is beschikbaar.</i>',
+  basis_detail_html:function(v){
+    return '<b>Hoe het is ingericht.</b> De organisatie betaalt maandelijks één factuur voor ieders '
+    + 'zetels. Anthropic meet apart hoeveel elke persoon verbruikte, en over de hele organisatie komt '
+    + 'dat gemeten verbruik neer op ongeveer <b>' + v.used + '%</b> van de factuur, dus er is echt '
+    + 'ruimte over. Jouw cijfers zijn jouw aandeel in dat verbruik toegepast op de factuur, wat betekent '
+    + 'dat de cijfers hier voor iedereen in de organisatie precies optellen tot wat er wordt betaald, '
+    + 'niet meer. Jouw zeteltype is <b>' + v.seat + '</b>. '
+    + 'Gekalibreerd ' + v.calibrated + '.'
+    + (v.credits
+        ? ' Eén ding dat de toewijzing niet meerekent: de organisatie houdt ook een vooruitbetaald '
+          + 'tegoed aan gebruikskrediet aan, zodat mensen door kunnen werken voorbij een planlimiet. '
+          + 'Dat is echt geld dat buiten de factuur om wordt uitgegeven, dus zwaar gebruik kost in '
+          + 'werkelijkheid iets meer dan hier getoond.'
+        : '');
+  },
+  subtitle_sub:'Jouw aandeel in wat we daadwerkelijk voor Claude betalen',
+  subtitle_list:'Jouw gebruik tegen Anthropic\'s gepubliceerde API-listprijzen',
+  th_price_model:'Model', th_price_input:'Input', th_price_output:'Output', th_price_cw:'Cache-schrijven', th_price_cr:'Cache-lezen',
+  btn_refreshing:'Vernieuwen…',
+  refresh_started_msg_html:'Je vernieuwingsopdracht is gestart. Deze leest je sessies opnieuw in en publiceert deze pagina opnieuw. Geef het een minuutje en herlaad dan.',
+  btn_refresh_started:'Vernieuwing gestart',
+  btn_refresh_now:'Nu vernieuwen',
+  refresh_error:function(v){ return 'Kon de vernieuwingsopdracht niet starten: ' + v.err + '. Voer claudecost.exe opnieuw uit.'; },
+  render_error:function(v){ return 'Er ging iets mis bij het renderen: '+v.msg; }
+}
+};
+function t(key, vars){
+  var s = (I18N[UI.lang] && I18N[UI.lang][key] !== undefined) ? I18N[UI.lang][key] : I18N.en[key];
+  return typeof s === 'function' ? s(vars||{}) : s;
+}
 
 function rate(){ return UI.cur==='eur' ? (UI.fx||0.92) : 1; }
 function pick(o){ return (UI.basis==='list' ? o.cost : (o.cost_sub != null ? o.cost_sub : o.cost)) || 0; }
@@ -441,7 +686,7 @@ function n(v){ return (v||0).toLocaleString('en-GB'); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){
   return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
 function monthLabel(k){
-  var p = k.split('-'), names=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var p = k.split('-'), names = MONTH_NAMES[UI.lang] || MONTH_NAMES.en;
   return names[parseInt(p[1],10)-1] + ' ' + p[0];
 }
 var SHORT = {cowork:'Cowork', code:'Code', code_agent:'Code agent', chat:'Chat'};
@@ -453,11 +698,11 @@ function topOf(obj, field){
 }
 
 // ---------- stamp ----------
-(function(){
-  var g = D.generated_at ? localStamp(D.generated_at) : 'unknown';
+function renderStamp(){
+  var g = D.generated_at ? localStamp(D.generated_at) : t('unknown');
   document.getElementById('stamp').innerHTML =
-    'Snapshot taken<br><b>' + esc(g) + '</b><br>' + esc(D.window_from) + ' → ' + esc(D.window_to);
-})();
+    t('snapshot_taken') + '<br><b>' + esc(g) + '</b><br>' + esc(D.window_from) + ' → ' + esc(D.window_to);
+}
 
 // ---------- overview ----------
 function monthKeys(){ return Object.keys(D.months||{}).sort(); }
@@ -468,16 +713,11 @@ function renderOverview(){
 
   document.getElementById('o_this').textContent = m ? money(pick(m)) : '—';
   document.getElementById('o_this_sub').textContent = m
-    ? monthLabel(cur)+' · '+n(m.sessions)+' sessions · '+n(m.calls)+' calls · '+tok(m.tokens)+' tokens' : '';
-  document.getElementById('o_last').textContent = p ? money(pick(p)) : 'no data';
+    ? monthLabel(cur)+' · '+n(m.sessions)+' '+t('sessions_word')+' · '+n(m.calls)+' '+t('calls_word')+' · '+tok(m.tokens)+' '+t('tokens_word') : '';
+  document.getElementById('o_last').textContent = p ? money(pick(p)) : t('no_data');
   document.getElementById('o_last_sub').textContent = p
-    ? monthLabel(prev)+' · '+n(p.sessions)+' sessions · '+tok(p.tokens)+' tokens' : 'nothing in the previous month';
-  var cardNote = UI.basis === 'sub'
-    ? 'This is your personal cut of the one Claude bill the company already pays, worked out '
-      + 'from how much you used compared with everyone else. It is not an extra charge, and it '
-      + 'is not your seat price. See the How it works tab.'
-    : 'What your tokens would cost at Anthropic\'s published API prices, if the company paid per '
-      + 'token instead of per seat. Useful for quoting client work. Not what we pay.';
+    ? monthLabel(prev)+' · '+n(p.sessions)+' '+t('sessions_word')+' · '+tok(p.tokens)+' '+t('tokens_word') : t('no_prev_month');
+  var cardNote = UI.basis === 'sub' ? t('card_note_sub') : t('card_note_list');
   document.getElementById('card_this').setAttribute('data-tip', cardNote);
   document.getElementById('card_last').setAttribute('data-tip', cardNote);
 
@@ -491,11 +731,11 @@ function renderOverview(){
   var top = null;
   thisMonth.forEach(function(s){ if(!top || pick(s) > pick(top)) top = s; });
   document.getElementById('k_top').textContent = cur
-    ? 'Busiest session in ' + monthLabel(cur) : 'Busiest session this month';
+    ? t('busiest_in', {month: monthLabel(cur)}) : t('busiest_generic');
   document.getElementById('o_top').textContent = top ? money(pick(top)) : '—';
   document.getElementById('o_top_sub').textContent = top
-    ? (top.title.length>58 ? top.title.slice(0,58)+'…' : top.title) + ' · ' + n(top.calls) + ' calls'
-    : 'no sessions yet this month';
+    ? (top.title.length>58 ? top.title.slice(0,58)+'…' : top.title) + ' · ' + n(top.calls) + ' ' + t('calls_word')
+    : t('no_sessions_yet');
 
   var lc = 0, tc = 0, ln = 0;
   thisMonth.forEach(function(s){ tc += pick(s); if(s.long){ lc += pick(s); ln++; } });
@@ -505,51 +745,45 @@ function renderOverview(){
   var seatPrice = SUB.your_seat_price_usd || 0;
   var curCost = m ? pick(m) : 0;
   document.getElementById('k_seat').textContent = cur
-    ? monthLabel(cur) + ' vs your licence' : 'This month vs your licence';
+    ? t('vs_licence', {month: monthLabel(cur)}) : t('vs_licence_generic');
   if(seatPrice > 0 && m){
     var dayNow = new Date(D.window_to || D.generated_at || Date.now()).getDate();
     document.getElementById('o_seat').textContent = (curCost/seatPrice).toFixed(1) + 'x';
-    document.getElementById('o_seat_sub').textContent =
-      money(curCost) + (UI.basis === 'sub' ? ' of subscription' : ' of API list value')
-      + ' against a ' + money(seatPrice) + '/month ' + (SUB.your_seat||'Standard')
-      + ' seat, ' + dayNow + ' day' + (dayNow===1?'':'s') + ' into the month'
-      + (prev ? '. Last month finished at ' + (pick(D.months[prev])/seatPrice).toFixed(1) + 'x.' : '');
+    document.getElementById('o_seat_sub').textContent = t('seat_sub', {
+      cost: money(curCost), sub: UI.basis === 'sub',
+      seatPrice: money(seatPrice), seatName: (SUB.your_seat||'Standard'),
+      dayNow: dayNow, prevX: prev ? (pick(D.months[prev])/seatPrice).toFixed(1) : null
+    });
   } else {
     document.getElementById('o_seat').textContent = '—';
     document.getElementById('o_seat_sub').textContent = seatPrice > 0
-      ? 'not enough data yet' : 'seat price not configured';
+      ? t('not_enough_data') : t('seat_not_configured');
   }
 
   // basis explainer
   var bn = document.getElementById('basis_note');
   if(UI.basis === 'sub'){
     bn.classList.remove('warn');
-    bn.innerHTML = '<b>This is not an extra charge, and not your seat price.</b> '
-      + 'It is your slice of the one invoice the organisation already pays, divided up by how much '
-      + 'each person actually used. Most seats go almost unused, so their share lands on the people '
-      + 'who do use Claude. That is why a heavy user can show several times their own seat price '
-      + 'while the company pays exactly the same either way. Nothing here is billed to you. '
-      + 'Full working on the About tab.';
+    bn.innerHTML = t('basis_note_sub_html');
   } else {
     bn.classList.add('warn');
-    bn.innerHTML = '<b>Showing API list price, not money we pay.</b> Every token at Anthropic\'s '
-      + 'published rates, cache traffic included. Runs several times the subscription figure. '
-      + 'Useful for pricing client work or sizing an API build, misleading as a cost report.';
+    bn.innerHTML = t('basis_note_list_html');
   }
 
   // verdict
   var v = document.getElementById('verdict'), msg;
   var share = tc>0 ? lc/tc : 0;
   var avg = thisMonth.length ? tc/thisMonth.length : 0;
-  var basisWord = UI.basis === 'sub' ? 'subscription cost' : 'token value';
+  var basisWord = UI.basis === 'sub' ? t('basis_word_sub') : t('basis_word_list');
+  var longCalls = D.long_session_calls||100;
   if(!(m && m.calls > 0)){
-    msg = '<b>Nothing yet this month.</b> No local Cowork or Claude Code activity since the month began. Cowork sessions that run in Anthropic\'s cloud, and claude.ai browser chats, leave no local transcript and cannot show up here. Check the Real spend tab instead.';
+    msg = t('verdict_none_html');
   } else if(share >= 0.45){
-    msg = '<b>Session length is your main cost driver.</b> '+Math.round(share*100)+'% of your '+basisWord+' sits in the '+ln+' session'+(ln===1?'':'s')+' that ran past '+(D.long_session_calls||100)+' calls. Splitting those into shorter, single-topic sessions is the one change that would move this number the most.';
+    msg = t('verdict_high', {pct: Math.round(share*100), basisWord: basisWord, ln: ln, longCalls: longCalls});
   } else if(share >= 0.2){
-    msg = '<b>A handful of long sessions carry a noticeable share.</b> '+Math.round(share*100)+'% of your '+basisWord+' is in '+ln+' marathon session'+(ln===1?'':'s')+' this month. Worth watching, not yet worth restructuring how you work.';
+    msg = t('verdict_mid', {pct: Math.round(share*100), basisWord: basisWord, ln: ln, longCalls: longCalls});
   } else {
-    msg = '<b>Your sessions are staying lean.</b> Only '+Math.round(share*100)+'% of your '+basisWord+' comes from sessions past '+(D.long_session_calls||100)+' calls, and the average session costs '+money(avg,2)+'. This is the cheap end of the distribution.';
+    msg = t('verdict_low', {pct: Math.round(share*100), basisWord: basisWord, longCalls: longCalls, avg: money(avg,2)});
   }
   v.innerHTML = msg;
 
@@ -567,9 +801,9 @@ function renderOverview(){
     });
   });
   document.getElementById('t_surface').innerHTML = shareTable(surf, ['sessions','calls','tokens','cost'],
-    ['Sessions','Calls','Tokens','Cost'], function(k){ return SL[k]||k; }, 'Surface');
+    [t('th_sessions'),t('th_calls'),t('th_tokens'),t('th_cost')], function(k){ return SL[k]||k; }, t('th_surface'));
   document.getElementById('t_model').innerHTML = shareTable(mods, ['calls','tokens','cost'],
-    ['Calls','Tokens','Cost'], function(k){ return k; }, 'Model');
+    [t('th_calls'),t('th_tokens'),t('th_cost')], function(k){ return k; }, t('th_model'));
 
   // composition
   var comp = {fresh:0, cache_w:0, cache_r:0, out:0};
@@ -578,14 +812,9 @@ function renderOverview(){
   });
   var ct = comp.fresh+comp.cache_w+comp.cache_r+comp.out;
   var pc = function(x){ return ct>0 ? (x/ct*100) : 0; };
-  document.getElementById('split_text').innerHTML =
-    '<h3>Read this once</h3><p style="margin-top:0">Of every token you spent, '
-    + pc(comp.cache_r).toFixed(1) + '% was Claude re-reading context it had already been sent, and only '
-    + pc(comp.out).toFixed(1) + '% was the answer it wrote back. '
-    + pc(comp.fresh).toFixed(1) + '% was genuinely new text you typed.</p>'
-    + '<p style="margin-bottom:0">That is normal and not waste in itself. It does mean the way to spend less is to '
-    + 'carry less context: shorter sessions, fewer loaded plugins and skills, leaner instruction files. '
-    + 'Switching to a cheaper model changes the multiplier; carrying less context changes the volume.</p>';
+  document.getElementById('split_text').innerHTML = t('split_text_html', {
+    cacheR: pc(comp.cache_r).toFixed(1), out: pc(comp.out).toFixed(1), fresh: pc(comp.fresh).toFixed(1)
+  });
 
   drawOverviewCharts(comp, pc);
 }
@@ -594,7 +823,7 @@ function shareTable(obj, fields, heads, labeller, firstHead){
   var keys = Object.keys(obj).sort(function(a,b){ return pick(obj[b]) - pick(obj[a]); });
   var tot = {}; fields.forEach(function(f){ tot[f] = 0; keys.forEach(function(k){ tot[f] += obj[k][f]||0; }); });
   tot.cost_sub = 0; keys.forEach(function(k){ tot.cost_sub += obj[k].cost_sub||0; });
-  var h = '<table><thead><tr><th class="nosort">'+esc(firstHead||'')+'</th>' + heads.map(function(x){ return '<th class="nosort">'+x+'</th>'; }).join('') + '<th class="nosort">Share</th></tr></thead><tbody>';
+  var h = '<table><thead><tr><th class="nosort">'+esc(firstHead||'')+'</th>' + heads.map(function(x){ return '<th class="nosort">'+x+'</th>'; }).join('') + '<th class="nosort">'+t('th_share')+'</th></tr></thead><tbody>';
   keys.forEach(function(k){
     h += '<tr><td>'+esc(labeller(k))+'</td>';
     fields.forEach(function(f){
@@ -604,7 +833,7 @@ function shareTable(obj, fields, heads, labeller, firstHead){
     var sh = tt>0 ? pick(obj[k])/tt*100 : 0;
     h += '<td>'+sh.toFixed(0)+'%<div class="bar"><i style="width:'+sh.toFixed(0)+'%"></i></div></td></tr>';
   });
-  h += '</tbody><tfoot><tr><td>Total</td>';
+  h += '</tbody><tfoot><tr><td>'+t('th_total')+'</td>';
   fields.forEach(function(f){
     h += '<td>' + (f==='cost' ? money(pick(tot)) : (f==='tokens' ? tok(tot[f]) : n(tot[f]))) + '</td>';
   });
@@ -615,20 +844,20 @@ function shareTable(obj, fields, heads, labeller, firstHead){
 function chartFallback(canvasId, label){
   var c = document.getElementById(canvasId);
   var box = c && c.closest('.chartbox');
-  if(box) box.innerHTML = '<div class="small" style="padding:14px 0">'+esc(label)
-    +' could not load (the chart library did not load from its CDN). The numbers above and the tables below are unaffected.</div>';
+  if(box) box.innerHTML = '<div class="small" style="padding:14px 0">'+esc(t('chart_could_not_load', {label: label}))+'</div>';
 }
 
 function drawOverviewCharts(comp, pc){
   if(typeof Chart === 'undefined'){
-    chartFallback('ch_days', 'Cost per day chart');
-    chartFallback('ch_split', 'Token split chart');
+    chartFallback('ch_days', t('chart_cost_per_day_label'));
+    chartFallback('ch_split', t('chart_share_title'));
     return;
   }
   try {
-  var pine='#003238', pineL='#007885', sun='#FFDD32', lav='#C08FFF';
+  var P = chartPalette();
+  var pine=P.accent, pineL=P.muted, sun=P.blue2, lav=P.blue3;
   var dayKeys = Object.keys(D.days||{}).sort();
-  var DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var DOW = DOW_SHORT[UI.lang] || DOW_SHORT.en;
   function dayLabel(k){
     var d = new Date(k + 'T12:00:00Z');
     return [k.slice(5), isNaN(d) ? '' : DOW[d.getUTCDay()]];
@@ -636,26 +865,26 @@ function drawOverviewCharts(comp, pc){
   if(charts.days) charts.days.destroy();
   charts.days = new Chart(document.getElementById('ch_days'), {type:'bar',
     data:{labels:dayKeys.map(dayLabel),
-      datasets:[{label:'Cost per day', data:dayKeys.map(function(k){ return +(pick(D.days[k])*rate()).toFixed(2); }),
+      datasets:[{label:t('chart_cost_per_day_label'), data:dayKeys.map(function(k){ return +(pick(D.days[k])*rate()).toFixed(2); }),
         backgroundColor:pineL, borderRadius:3}]},
     options:{responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{display:false}, title:{display:true, text:'Cost per day ('+sym()+')', font:{size:12.5,weight:'600'}, color:pine},
+      plugins:{legend:{display:false}, title:{display:true, text:t('chart_cost_per_day', {sym: sym()}), font:{size:12.5,weight:'600'}, color:pine},
         tooltip:{callbacks:{afterLabel:function(c){ var k=dayKeys[c.dataIndex], d=D.days[k];
-          return n(d.calls)+' calls · '+tok(d.tokens)+' tokens'; }}}},
-      scales:{y:{beginAtZero:true, grid:{color:'#E3E0DE'}, ticks:{font:{size:11}}},
+          return t('tooltip_calls_tokens', {calls: n(d.calls), tokens: tok(d.tokens)}); }}}},
+      scales:{y:{beginAtZero:true, grid:{color:P.grid}, ticks:{font:{size:11}}},
               x:{grid:{display:false}, ticks:{font:{size:10}, maxRotation:0, autoSkip:false}}}}});
 
   if(charts.split) charts.split.destroy();
   charts.split = new Chart(document.getElementById('ch_split'), {type:'doughnut',
-    data:{labels:['Cache read, re-sent context','Cache write, storing context','Output, the answer','Fresh input, what you typed'],
+    data:{labels:t('doughnut_labels'),
       datasets:[{data:[+pc(comp.cache_r).toFixed(2), +pc(comp.cache_w).toFixed(2), +pc(comp.out).toFixed(2), +pc(comp.fresh).toFixed(2)],
-        backgroundColor:[pine,pineL,sun,lav], borderWidth:2, borderColor:'#fff'}]},
+        backgroundColor:[pine,pineL,sun,lav], borderWidth:2, borderColor:P.card}]},
     options:{responsive:true, maintainAspectRatio:false,
       plugins:{legend:{position:'bottom', labels:{font:{size:11}, boxWidth:12}},
-        title:{display:true, text:'Share of your token volume', font:{size:12.5,weight:'600'}, color:pine}}}});
+        title:{display:true, text:t('chart_share_title'), font:{size:12.5,weight:'600'}, color:pine}}}});
   } catch(e){
-    chartFallback('ch_days', 'Cost per day chart');
-    chartFallback('ch_split', 'Token split chart');
+    chartFallback('ch_days', t('chart_cost_per_day_label'));
+    chartFallback('ch_split', t('chart_share_title'));
   }
 }
 
@@ -684,17 +913,17 @@ function periodRows(src, tbodySel, opts){
     tr.innerHTML = cells.join('');
     tb.appendChild(tr);
   });
-  if(!keys.length) tb.innerHTML = '<tr><td colspan="9" class="small">Nothing in this period.</td></tr>';
+  if(!keys.length) tb.innerHTML = '<tr><td colspan="9" class="small">'+t('nothing_in_period')+'</td></tr>';
 }
 
-var DOWFULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 function dayWithName(k){
   var d = new Date(k + 'T12:00:00Z');
-  return isNaN(d) ? k : k + '  ' + DOWFULL[d.getUTCDay()];
+  var full = DOW_FULL[UI.lang] || DOW_FULL.en;
+  return isNaN(d) ? k : k + '  ' + full[d.getUTCDay()];
 }
 function weekLabel(k){
   var p = k.split('-W');
-  return 'Week ' + parseInt(p[1],10) + ', ' + p[0];
+  return t('week_label', {n: parseInt(p[1],10), y: p[0]});
 }
 
 function renderPeriods(){
@@ -705,18 +934,19 @@ function renderPeriods(){
   var wk = Object.keys(D.weeks||{}).sort();
   if(charts.weeks) charts.weeks.destroy();
   if(wk.length && typeof Chart === 'undefined'){
-    chartFallback('ch_weeks', 'Cost per week chart');
+    chartFallback('ch_weeks', t('chart_cost_per_week', {sym: sym()}));
   } else if(wk.length){
     try {
+      var P = chartPalette();
       charts.weeks = new Chart(document.getElementById('ch_weeks'), {type:'bar',
         data:{labels:wk.map(weekLabel),
-          datasets:[{label:'Cost', data:wk.map(function(k){ return +(pick(D.weeks[k])*rate()).toFixed(2); }),
-            backgroundColor:'#003238', borderRadius:4}]},
+          datasets:[{label:t('chart_cost_label'), data:wk.map(function(k){ return +(pick(D.weeks[k])*rate()).toFixed(2); }),
+            backgroundColor:P.accent, borderRadius:4}]},
         options:{responsive:true, maintainAspectRatio:false,
-          plugins:{legend:{display:false}, title:{display:true, text:'Cost per week ('+sym()+')', font:{size:12.5,weight:'600'}, color:'#003238'}},
-          scales:{y:{beginAtZero:true, grid:{color:'#E3E0DE'}}, x:{grid:{display:false}}}}});
+          plugins:{legend:{display:false}, title:{display:true, text:t('chart_cost_per_week', {sym: sym()}), font:{size:12.5,weight:'600'}, color:P.text}},
+          scales:{y:{beginAtZero:true, grid:{color:P.grid}}, x:{grid:{display:false}}}}});
     } catch(e){
-      chartFallback('ch_weeks', 'Cost per week chart');
+      chartFallback('ch_weeks', t('chart_cost_per_week', {sym: sym()}));
     }
   }
 }
@@ -750,8 +980,7 @@ function renderTools(){
   var canvas = document.getElementById('ch_tools');
   var box = canvas ? canvas.closest('.chartbox') : null;
   if(!groups.length || !totalCalls){
-    tb.innerHTML = '<tr><td colspan="4" class="small">No tool data yet. Tool counting starts with '
-      + 'v0.5.0, so sessions parsed by an earlier version show nothing until the cache is rebuilt.</td></tr>';
+    tb.innerHTML = '<tr><td colspan="4" class="small">'+t('tools_no_data_html')+'</td></tr>';
     if(box) box.style.display = 'none';
     if(charts.tools){ charts.tools.destroy(); charts.tools = null; }
     return;
@@ -772,20 +1001,21 @@ function renderTools(){
   var top = groups.slice(0, 8);
   if(charts.tools) charts.tools.destroy();
   if(typeof Chart === 'undefined'){
-    chartFallback('ch_tools', 'Tool usage chart');
+    chartFallback('ch_tools', t('chart_tools_title'));
     return;
   }
   try {
+    var P = chartPalette();
     charts.tools = new Chart(canvas, {type:'bar',
       data:{labels: top.map(function(g){ return groupDisplay(g).short; }),
-        datasets:[{label:'Calls', data: top.map(function(g){ return totals[g].calls; }),
-          backgroundColor:'#003238', borderRadius:4}]},
+        datasets:[{label:t('chart_calls_label'), data: top.map(function(g){ return totals[g].calls; }),
+          backgroundColor:P.accent, borderRadius:4}]},
       options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
-        plugins:{legend:{display:false}, title:{display:true, text:'Top connectors, plugins and skills by call count', font:{size:12.5,weight:'600'}, color:'#003238'}},
-        scales:{x:{beginAtZero:true, grid:{color:'#E3E0DE'}},
+        plugins:{legend:{display:false}, title:{display:true, text:t('chart_tools_title'), font:{size:12.5,weight:'600'}, color:P.text}},
+        scales:{x:{beginAtZero:true, grid:{color:P.grid}},
                 y:{grid:{display:false}, ticks:{font:{size:9}, autoSkip:false}}}}});
   } catch(e){
-    chartFallback('ch_tools', 'Tool usage chart');
+    chartFallback('ch_tools', t('chart_tools_title'));
   }
 }
 
@@ -832,16 +1062,16 @@ function renderSessions(){
       + '<td data-full="'+esc(s.title)+'">'+esc(s.title)+'</td>'
       + '<td title="'+esc(SL[s.surface]||s.surface)+'">'+esc(shortSurface(s.surface))+'</td>'
       + '<td title="'+esc(mkeys.join(', '))+'">'+models+'</td>'
-      + '<td>'+n(s.calls)+(s.long?' <span class="pill sun">long</span>':'')+'</td>'
+      + '<td>'+n(s.calls)+(s.long?' <span class="pill sun">'+t('long_pill')+'</span>':'')+'</td>'
       + '<td>'+tok(s.tokens)+'</td>'
       + '<td>'+money(pickCall(s),3)+'</td>'
       + '<td><b>'+money(pick(s),2)+'</b></td>';
     tb.appendChild(tr);
   });
-  if(!ss.length) tb.innerHTML = '<tr><td colspan="8" class="small">No sessions match these filters.</td></tr>';
+  if(!ss.length) tb.innerHTML = '<tr><td colspan="8" class="small">'+t('no_sessions_match')+'</td></tr>';
   document.querySelector('#t_sessions tfoot').innerHTML = ss.length
-    ? '<tr><td>'+ss.length+' sessions</td><td></td><td></td><td></td><td>'+n(tcalls)+'</td><td>'+tok(tt)+'</td><td>'+(tcalls?money(tc/tcalls,3):'—')+'</td><td>'+money(tc)+'</td></tr>' : '';
-  document.getElementById('s_count').textContent = ss.length + ' of ' + (D.sessions||[]).length + ' sessions shown';
+    ? '<tr><td>'+t('sessions_count',{n:ss.length})+'</td><td></td><td></td><td></td><td>'+n(tcalls)+'</td><td>'+tok(tt)+'</td><td>'+(tcalls?money(tc/tcalls,3):'—')+'</td><td>'+money(tc)+'</td></tr>' : '';
+  document.getElementById('s_count').textContent = t('sessions_shown', {shown: ss.length, total: (D.sessions||[]).length});
 }
 
 function bindTitleTip(){
@@ -924,35 +1154,25 @@ function renderBasisDetail(){
   var el = document.getElementById('basis_detail');
   if(!el) return;
   if(!SUB.monthly_subscription_usd){
-    el.innerHTML = '<i>No subscription figures configured, so only API list price is available.</i>';
+    el.innerHTML = t('basis_detail_none_html');
     return;
   }
   var used = SUB.company_consumption_usd > 0 && SUB.monthly_subscription_usd > 0
     ? SUB.company_consumption_usd / SUB.monthly_subscription_usd * 100 : 0;
-  el.innerHTML = '<b>How it is set up.</b> The organisation pays one monthly invoice for everyone\'s '
-    + 'seats. Anthropic separately meters how much each person consumed, and across the whole '
-    + 'organisation that metered consumption comes to roughly <b>' + Math.round(used) + '%</b> of the '
-    + 'invoice, so there is real headroom. Your figures are your share of that consumption applied to '
-    + 'the invoice, which means the numbers here for everyone in the organisation add up to exactly '
-    + 'what is paid, no more. Your seat tier is <b>' + esc(SUB.your_seat || 'Standard') + '</b>. '
-    + 'Calibrated ' + esc(SUB.calibrated_on || 'unknown') + '.'
-    + (SUB.usage_credits_balance_eur
-        ? ' One thing the allocation leaves out: the organisation also keeps a prepaid balance of '
-          + 'usage credits so people can carry on working past a plan limit. That is real money spent '
-          + 'outside the invoice, so heavy usage costs a little more than shown here.'
-        : '');
+  el.innerHTML = t('basis_detail_html', {
+    used: Math.round(used), seat: esc(SUB.your_seat || 'Standard'),
+    calibrated: esc(SUB.calibrated_on || t('unknown')), credits: !!SUB.usage_credits_balance_eur
+  });
 }
 
 function renderSubtitle(){
   var el = document.getElementById('subtitle');
-  if(el) el.textContent = UI.basis === 'sub'
-    ? 'Your share of what we actually pay for Claude'
-    : 'Your usage at Anthropic\'s published API list prices';
+  if(el) el.textContent = UI.basis === 'sub' ? t('subtitle_sub') : t('subtitle_list');
 }
 
 function renderPrices(){
   var p = D.prices_usd_per_mtok || {};
-  var h = '<table><thead><tr><th class="nosort">Model</th><th class="nosort">Input</th><th class="nosort">Output</th><th class="nosort">Cache write</th><th class="nosort">Cache read</th></tr></thead><tbody>';
+  var h = '<table><thead><tr><th class="nosort">'+t('th_price_model')+'</th><th class="nosort">'+t('th_price_input')+'</th><th class="nosort">'+t('th_price_output')+'</th><th class="nosort">'+t('th_price_cw')+'</th><th class="nosort">'+t('th_price_cr')+'</th></tr></thead><tbody>';
   Object.keys(p).forEach(function(k){
     h += '<tr><td>'+esc(k)+'</td><td>$'+p[k].input.toFixed(2)+'</td><td>$'+p[k].output.toFixed(2)
        + '</td><td>$'+p[k].cache_write.toFixed(2)+'</td><td>$'+p[k].cache_read.toFixed(2)+'</td></tr>';
@@ -972,19 +1192,19 @@ function bindRefresh(){
   var api = (typeof window !== 'undefined' && window.cowork) ? window.cowork : null;
   if(!taskId || !api || typeof api.runScheduledTask !== 'function') return;
   btn.classList.remove('hidden');
+  btn.textContent = t('btn_refresh_now');
   btn.addEventListener('click', function(){
     btn.disabled = true;
-    btn.textContent = 'Refreshing…';
+    btn.textContent = t('btn_refreshing');
     msg.classList.remove('hidden');
-    msg.innerHTML = 'Started your refresh job. It re-reads your sessions and republishes this page. Give it a minute, then reload.';
+    msg.innerHTML = t('refresh_started_msg_html');
     Promise.resolve(api.runScheduledTask(taskId)).then(function(){
-      btn.textContent = 'Refresh started';
+      btn.textContent = t('btn_refresh_started');
     }).catch(function(err){
       btn.disabled = false;
-      btn.textContent = 'Refresh now';
+      btn.textContent = t('btn_refresh_now');
       msg.classList.add('warn');
-      msg.innerHTML = 'Could not start the refresh job: ' + esc(err && err.message ? err.message : String(err))
-        + '. Run claudecost.exe again instead.';
+      msg.innerHTML = t('refresh_error', {err: esc(err && err.message ? err.message : String(err))});
     });
   });
 }
@@ -993,7 +1213,7 @@ function bindRefresh(){
 function renderAll(){
   // Each stage runs independently: one broken stage (e.g. a chart library that
   // failed to load) must not blank out the tables that come after it.
-  [renderSubtitle, renderOverview, renderPeriods, renderSessions, renderTools, renderBasisDetail].forEach(function(fn){
+  [renderStamp, renderSubtitle, renderOverview, renderPeriods, renderSessions, renderTools, renderBasisDetail].forEach(function(fn){
     try { fn(); } catch(e){ console.error('claude-cost-user render stage failed:', fn.name, e); }
   });
 }
@@ -1081,9 +1301,21 @@ updateTabBackBtn();
 document.getElementById('cur').value = UI.cur;
 document.getElementById('basis').value = UI.basis;
 document.getElementById('fx').value = UI.fx;
+applyTheme();
+document.getElementById('btn_lang').addEventListener('click', function(){
+  UI.lang = UI.lang === 'en' ? 'nl' : 'en'; persist();
+  applyTopbarLabels();
+  renderPrices(); renderAll();
+  var rbtn = document.getElementById('btn_refresh');
+  if(!rbtn.classList.contains('hidden') && !rbtn.disabled) rbtn.textContent = t('btn_refresh_now');
+});
+document.getElementById('btn_theme').addEventListener('click', function(){
+  UI.theme = UI.theme === 'light' ? 'dark' : 'light'; persist();
+  applyTheme(); renderAll();
+});
 buildFilters(); bindTitleTip(); bindRefresh(); renderPrices();
 try { renderAll(); } catch(e){
-  document.getElementById('verdict').innerHTML = '<b style="color:var(--warn)">Something went wrong rendering: '+esc(e.message)+'</b>';
+  document.getElementById('verdict').innerHTML = '<b style="color:var(--warn)">'+esc(t('render_error',{msg:e.message}))+'</b>';
 }
 })();
 </script>
