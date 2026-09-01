@@ -12,7 +12,7 @@
       "ProductName": "claudecost",
       "ProductVersion": "0.7.0",
       "FileVersion": "0.7.0",
-      "OriginalFilename": "claudecost.exe",
+      "OriginalFilename": "claudecost-cli.exe",
       "InternalName": "claudecost",
       "LegalCopyright": "Copyright (c) 2026 Wilco de Tree" } } } } }
 }

@@ -28,7 +28,7 @@ import (
 	"claudecost/internal/report"
 )
 
-const version = "0.8.0"
+const version = "0.8.1"
 
 type multiFlag []string
 
@@ -66,6 +66,22 @@ func run() int {
 		return 1
 	}
 
+	// An explicit -seat wins; otherwise a your_seat set in claudecost.json
+	// wins over the flag's own "Standard" default, so a shared config for a
+	// team that is all on one tier (see the Groundwork Kit) never needs
+	// -seat passed by hand. flag.Visit is the only way to tell "passed at
+	// its default value" from "not passed at all".
+	effectiveSeat := *seat
+	seatFlagSet := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "seat" {
+			seatFlagSet = true
+		}
+	})
+	if !seatFlagSet && cfg.Subscription.YourSeat != "" {
+		effectiveSeat = cfg.Subscription.YourSeat
+	}
+
 	// The CLI runs once and exits, so this Cache only lives for one Collect
 	// call; the disk-persisted parse cache below is what carries the benefit
 	// across runs, same file the app binary also reads and writes.
@@ -93,7 +109,7 @@ func run() int {
 	// refresh cadences" in docs/2026-08-17_wsl-source-detection-design.md,
 	// which only applies to the app's own interval tickers.
 	opts := dataset.CollectOpts{
-		Seat:        *seat,
+		Seat:        effectiveSeat,
 		MonthsN:     *monthsN,
 		Sources:     []string(sources),
 		RefreshSlow: true,

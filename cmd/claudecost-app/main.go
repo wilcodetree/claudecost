@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	version        = "0.8.0"
+	version        = "0.8.1"
 	windowTitle    = "Claude Cost"
 	mutexName      = `Local\claudecost-app`
 	minInterval    = 5 * time.Minute
@@ -72,11 +72,19 @@ func main() {
 	// -wsl-interval wins over wsl_interval_hours in config; whether it was
 	// actually passed (as opposed to sitting at its flag default) is only
 	// knowable via flag.Visit, since flag.Duration itself cannot tell "not
-	// set" from "set to the default".
+	// set" from "set to the default". Same trick for -seat against
+	// your_seat: an explicit -seat always wins, otherwise a your_seat in
+	// claudecost.json beats the flag's own "Standard" default, so a shared
+	// config for a team on one tier (see the Groundwork Kit) never needs
+	// anyone to open Settings on first run.
 	wslIntervalFlagSet := false
+	seatFlagSet := false
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "wsl-interval" {
 			wslIntervalFlagSet = true
+		}
+		if f.Name == "seat" {
+			seatFlagSet = true
 		}
 	})
 
@@ -89,13 +97,26 @@ func main() {
 	setupLog(dataDir)
 	log.Printf("claudecost-app %s starting", version)
 
-	// Same idea as the CLI's exe-adjacent lookup, just rooted at the app's
-	// own data folder instead: nothing is written or read next to the exe,
-	// so it can run from a read-only share. This is what makes a quarterly
-	// price/subscription recalibration a "drop one file" update instead of
-	// a rebuild: place claudecost.json in %LOCALAPPDATA%\claudecost\ and
-	// restart the app.
+	// Two-tier lookup, exe-adjacent first: this makes claudecost.exe plus
+	// claudecost.json droppable together into one portable folder (the
+	// ZeroNonsense.dev Groundwork Kit ships exactly this pair), the same
+	// "drop one file next to the exe" pattern the CLI already used and that
+	// claudecost.json's own bundled _comment describes. Falls back to
+	// %LOCALAPPDATA%\claudecost\claudecost.json, so a fixed install that
+	// must run from a read-only share (nothing written or read next to the
+	// exe in that case) keeps working exactly as before: place
+	// claudecost.json in %LOCALAPPDATA%\claudecost\ and restart the app.
+	// Whichever file loads is also where Settings saves land afterward
+	// (cfgSavePath below), so a Groundwork Kit user editing Settings keeps
+	// writing to their own portable folder, not %LOCALAPPDATA%.
 	cfgFile := *cfgPath
+	if cfgFile == "" {
+		if exe, err := os.Executable(); err == nil {
+			if cand := filepath.Join(filepath.Dir(exe), "claudecost.json"); fileExists(cand) {
+				cfgFile = cand
+			}
+		}
+	}
 	if cfgFile == "" {
 		if cand := filepath.Join(dataDir, "claudecost.json"); fileExists(cand) {
 			cfgFile = cand
@@ -115,6 +136,10 @@ func main() {
 	effectiveWSLInterval := *wslInterval
 	if !wslIntervalFlagSet && cfg.WSLIntervalHours > 0 {
 		effectiveWSLInterval = time.Duration(cfg.WSLIntervalHours * float64(time.Hour))
+	}
+	effectiveSeat := *seat
+	if !seatFlagSet && cfg.Subscription.YourSeat != "" {
+		effectiveSeat = cfg.Subscription.YourSeat
 	}
 	if effectiveWSLInterval < minWSLInterval {
 		effectiveWSLInterval = minWSLInterval
@@ -143,7 +168,7 @@ func main() {
 
 	a := &app{
 		cfg:         cfg,
-		seat:        *seat,
+		seat:        effectiveSeat,
 		monthsN:     *monthsN,
 		sources:     []string(sources),
 		htmlPath:    filepath.Join(dataDir, "dashboard.html"),
@@ -494,6 +519,7 @@ func (a *app) applySettings(p settingsPayload) error {
 		OutputCostFactor:          p.OutputCostFactor,
 		CalibratedOn:              p.CalibratedOn,
 		Window:                    p.Window,
+		YourSeat:                  p.YourSeat,
 	}
 	if err := writeSubscriptionConfig(a.cfgPath, sub); err != nil {
 		return err
@@ -586,7 +612,7 @@ func warmingPageHTML() string {
 	return strings.Replace(warmingPageTemplate, "APP_VERSION", version, 1)
 }
 
-const cliRebuildNotice = `<b>This page is rebuilt every time you run claudecost.exe.</b> It reads your session transcripts live at each run, so refreshing is simply running it again: a new report is written and opened for you.`
+const cliRebuildNotice = `<b>This page is rebuilt every time you run the claudecost CLI again.</b> It reads your session transcripts live at each run, so refreshing is simply running it again: a new report is written and opened for you.`
 
 // appRebuildNotice produces the app window's "how this stays current" text.
 // With no WSL distros found, it reproduces today's single-cadence wording
@@ -626,14 +652,14 @@ const stampAnchor = `<div class="stamp" id="stamp"></div>`
 func (a *app) stampAreaHTML() string {
 	wslStamp := ""
 	if len(a.wslDistros) > 0 && !a.cache.SlowScannedAt.IsZero() {
-		wslStamp = ` <span style="color:var(--pine-40);font-size:11px;opacity:.75;white-space:nowrap" title="WSL transcripts are re-read on a slower, ` +
+		wslStamp = ` <span style="color:var(--muted);font-size:11px;white-space:nowrap" title="WSL transcripts are re-read on a slower, ` +
 			formatHours(a.wslInterval) +
 			` cycle because reading Linux files from Windows is slow; native Windows transcripts are current as of the main snapshot time.">WSL data as of ` +
 			a.cache.SlowScannedAt.Format("15:04") + `</span>`
 	}
 	return `<div style="display:flex;align-items:center;gap:12px">
  <span style="color:var(--sun);font-size:11px;white-space:nowrap">v` + version + `</span>` + wslStamp + `
- <span id="cc_progress" style="display:none;color:var(--pine-40);font-size:12px;white-space:nowrap"></span>
+ <span id="cc_progress" style="display:none;color:var(--muted);font-size:12px;white-space:nowrap"></span>
  <button id="cc_settings_btn" class="act ghost" type="button" title="Subscription settings" style="padding:6px 10px;white-space:nowrap">&#9881;</button>
  <button id="cc_btn" class="act" type="button" style="padding:6px 12px;white-space:nowrap">Refresh now</button>
  ` + stampAnchor + `
@@ -749,7 +775,7 @@ func (a *app) settingsModalHTML() string {
 <div id="cc_settings_overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;font-family:'Inter','Segoe UI',sans-serif">
  <div style="background:#1f2733;color:#eee;border-radius:10px;padding:22px 26px;width:480px;max-height:86vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.5)">
   <h3 style="margin:0 0 4px;font-size:16px">Subscription settings</h3>
-  <p style="margin:0 0 16px;color:#9fb4bd;font-size:12px">Saved to claudecost.json in this window's data folder. Saving triggers a full re-read: cached sessions carry costs computed with the old numbers.</p>
+  <p style="margin:0 0 16px;color:#9fb4bd;font-size:12px">Saved to ` + escapeAttr(a.cfgPath) + `. Saving triggers a full re-read: cached sessions carry costs computed with the old numbers.</p>
   <div id="cc_settings_error" style="display:none;margin-bottom:12px;color:#ff8a65;font-size:12px"></div>
   <style>
    #cc_settings_overlay label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#c8d4d9}

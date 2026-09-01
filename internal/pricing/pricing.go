@@ -36,6 +36,14 @@ type Subscription struct {
 	OutputCostFactor          float64            `json:"output_cost_factor"`
 	CalibratedOn              string             `json:"calibrated_on"`
 	Window                    string             `json:"window"`
+
+	// YourSeat is the default "Your seat" tier, a key into SeatPriceUSD
+	// (e.g. "Standard" or "Premium"). Empty means no override: both binaries
+	// fall back to their -seat flag default ("Standard"). Set this when
+	// everyone who will run this claudecost.json shares one seat tier, so
+	// they never have to touch Settings or pass -seat themselves. The -seat
+	// flag, when explicitly passed, still wins over this.
+	YourSeat string `json:"your_seat,omitempty"`
 }
 
 type Config struct {

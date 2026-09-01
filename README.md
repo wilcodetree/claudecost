@@ -17,7 +17,7 @@ calls, no install.
 
 ## The app (recommended)
 
-Double-click `claudecost-app.exe`. One window opens, no console, no tray
+Double-click `claudecost.exe`. One window opens, no console, no tray
 icon, no browser tab. It collects your usage on startup, again every 30
 minutes while the window stays open, and whenever you press "Refresh now" in
 the bottom-right corner. Close the window and the app is gone; nothing keeps
@@ -27,8 +27,11 @@ running in the background.
 - Needs the WebView2 runtime, which ships with Edge on Windows 10/11. If it
   is somehow missing, the app falls back to writing the report once and
   opening it in your default browser instead.
-- Data, cache and log live under `%LOCALAPPDATA%\claudecost\`, never next to
-  the exe, so it can run from a read-only share.
+- Checks for a `claudecost.json` next to the exe first (so the exe and the
+  config can be dropped together into one portable folder), then falls back
+  to `%LOCALAPPDATA%\claudecost\claudecost.json` for a fixed install that
+  must run from a read-only share. Cache and log always live under
+  `%LOCALAPPDATA%\claudecost\`, regardless of which config was used.
 - Launching it a second time brings the existing window to the front instead
   of opening a second copy.
 - Flags: `-interval` (default 15m, floor 5m), `-wsl-interval` (how often to
@@ -43,7 +46,12 @@ running in the background.
 - Click the gear icon (top right, next to Refresh now) to edit your
   subscription numbers, seat counts and seat prices from inside the window,
   no more hand-editing `claudecost.json`. Saving re-reads everything, since
-  cached sessions carry costs computed with the old numbers.
+  cached sessions carry costs computed with the old numbers. Settings saves
+  land back in whichever `claudecost.json` was actually loaded, exe-adjacent
+  or `%LOCALAPPDATA%`, not always the latter.
+- Set `"your_seat"` in `claudecost.json` (e.g. `"Premium"`) to default the
+  "Your seat" dropdown for everyone who runs this config, useful when a
+  whole team shares one seat tier. An explicit `-seat` flag still wins.
 
 Windows will likely show a blue "Windows protected your PC" screen the first
 time, since this is an unsigned binary. That is expected: click **More info**,
@@ -56,7 +64,8 @@ report and opens it once, then exits.
 
     claudecost                  build the dashboard and open it in the browser
     claudecost -months 3        widen the window to three months
-    claudecost -seat Premium    price your seat tier correctly (default Standard)
+    claudecost -seat Premium    price your seat tier correctly (default Standard,
+                                 or your_seat from claudecost.json if set)
     claudecost -no-open         write the report without opening it
     claudecost -json data.json  also write the raw dataset
     claudecost -source DIR      scan DIR instead of the auto-detected folders
@@ -127,9 +136,11 @@ folder:
     .\build.ps1
 
 First run needs internet access: it fetches `go-winres` for the icons and
-`go mod tidy` resolves the WebView2 binding. Produces `claudecost.exe` (the
-CLI) and `claudecost-app.exe` (the app), both portable single files. Copy
-them anywhere; no install.
+`go mod tidy` resolves the WebView2 binding. Produces `claudecost-cli.exe`
+(the CLI) and `claudecost.exe` (the app), both portable single files. Copy
+them anywhere; no install. If a `build.local.ps1` exists next to `build.ps1`
+(gitignored, machine-local), it runs afterward; use it for any private
+post-build step such as copying the built app into another folder.
 
 ## Configuration
 
@@ -146,8 +157,9 @@ everything.
 Or edit the file directly, useful for the CLI, for scripting, or for
 anything outside the subscription block, such as an unusual per-model price
 override or the WSL settings described above: drop a `claudecost.json` next
-to the exe (CLI) or pass `-config` (app), overriding any subset of the
-defaults. See `claudecost.example.json`.
+to the exe, CLI or app alike, or pass `-config` explicitly, or (app only)
+place it in `%LOCALAPPDATA%\claudecost\` for a fixed, read-only-share
+install. Overrides any subset of the defaults. See `claudecost.example.json`.
 The recommended calibration source is your real invoice total divided by
 consumption, not seats times list price, since a flat subscription rarely
 maps cleanly to per-seat usage.
